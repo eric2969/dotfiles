@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # remove below line if you want to setup
-exit
+#exit
 # DEBUG: echo command before execute
 # set -x
 
@@ -47,6 +47,7 @@ dir=$(dirname "$filepath")
 cp $dir/.zshrc ~/.zshrc
 cp $dir/.mytheme.sh ~/.mytheme.sh
 cp $dir/.vimrc ~/.vimrc
+cp $dir/.p10k.zsh ~/.p10k.zsh
 
 # setup antigen
 printf "${YELLOW}Setting up antigen for zsh package management\n${NC}"
