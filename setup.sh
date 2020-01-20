@@ -13,7 +13,8 @@ printf "${YELLOW}Installing dependencies\n${NC}"
 
 if [ -x "$(command -v brew)" ]; then
   # macOS
-  brew install curl git
+  brew install curl git gcc gdb grep;
+  brew update;brew upgrade;
 elif [ -x "$(command -v apt)" ]; then
   # Ubuntu
   sudo apt install curl git
