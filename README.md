@@ -8,6 +8,7 @@ My dotfiles.
 
 ## Setup
 
+remove comment from setup.sh line 4
 ```sh
 ./setup.sh
 ```
