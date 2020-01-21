@@ -17,7 +17,7 @@ if [ -x "$(command -v brew)" ]; then
   brew update;brew upgrade;
 elif [ -x "$(command -v apt)" ]; then
   # Ubuntu
-  sudo apt install curl git
+  sudo apt install curl git zsh
 elif [ -x "$(command -v dnf)" ]; then
   # Fedora
   # util-linux-user: chsh
@@ -31,6 +31,8 @@ fi
 if [ ! -x "$(command -v zsh)" ]; then
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && chsh -s $(which zsh)
 fi
+
+chsh -s $(which zsh)
 
 # download Sauce Code Pro Nerd font and build link
 mkdir -p ~/.local/share/fonts
