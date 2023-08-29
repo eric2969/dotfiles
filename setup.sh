@@ -47,7 +47,6 @@ printf "${YELLOW}Building link to dotfiles${NC}\n"
 filepath=$(realpath "$0")
 dir=$(dirname "$filepath")
 cp $dir/.zshrc ~/.zshrc
-cp $dir/.mytheme.sh ~/.mytheme.sh
 cp $dir/.vimrc ~/.vimrc
 cp $dir/.p10k.zsh ~/.p10k.zsh
 

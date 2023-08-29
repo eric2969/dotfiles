@@ -121,10 +121,10 @@ inoremap {<CR> {<CR>}<ESC>ko
 " C++ / Python utils
 nnoremap <F7> <ESC>:w<CR>:!python %<CR>
 nnoremap <F8> <ESC>:w<CR>:!python3 %<CR>
-nnoremap <F9> <ESC>:w<CR>:!g++-9 -std=c++14 -O2 -Wall -Wextra -Wshadow -o tmp %<CR>
+nnoremap <F9> <ESC>:w<CR>:!g++-13 -std=c++20 -O2 -Wall -Wextra -Wshadow -o tmp %<CR>
 nnoremap <F11> :!./tmp<CR>
 nnoremap <F11> :!./tmp < in<CR>
-nnoremap c <ESC>:w<CR>:!g++-9 -std=c++14 -O2 -Wall -Wextra -Wshadow -o tmp %<CR>
+nnoremap c <ESC>:w<CR>:!g++-13 -std=c++20 -O2 -Wall -Wextra -Wshadow -o tmp %<CR>
 nnoremap r <ESC>:!./tmp<CR>
 nnoremap R <ESC>:!./tmp < in<CR>
 
