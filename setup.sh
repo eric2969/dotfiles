@@ -49,6 +49,9 @@ dir=$(dirname "$filepath")
 cp $dir/.zshrc ~/.zshrc
 cp $dir/.vimrc ~/.vimrc
 cp $dir/.p10k.zsh ~/.p10k.zsh
+if [[ ! -e ~/.bash_profile ]];then
+    touch ~/.bash_profile
+fi
 
 # setup antigen
 printf "${YELLOW}Setting up antigen for zsh package management\n${NC}"
