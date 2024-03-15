@@ -9,22 +9,23 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-printf "${YELLOW}Installing dependencies\n${NC}"
-
-if [ -x "$(command -v brew)" ]; then
-  # macOS
-  brew install curl git gcc gdb grep;
-  brew update;brew upgrade;
-elif [ -x "$(command -v apt)" ]; then
-  # Ubuntu
-  sudo apt install curl git zsh
-elif [ -x "$(command -v dnf)" ]; then
-  # Fedora
-  # util-linux-user: chsh
-  sudo dnf install curl git util-linux-user zsh
+if [[ $1 == "-n" ]]; then
+    printf "${RED}Ignoring dependencies install\n${NC}"
 else
-  printf "${RED}Unknown os, exiting...${NC}"
-  exit
+    printf "${YELLOW}Installing dependencies\n${NC}"
+    if [ -x "$(command -v brew)" ]; then # macOS
+        brew install curl git gcc gdb grep;
+        brew update;brew upgrade;
+    elif [ -x "$(command -v apt)" ]; then # Ubuntu
+        sudo apt install curl git zsh
+    elif [ -x "$(command -v dnf)" ]; then # Fedora
+        sudo dnf install curl git util-linux-user zsh
+    elif [ -x "$(command -v pacman)" ];then #Arch
+        sudo pacman -S curl git zsh
+    else
+        printf "${RED}Unknown os, exiting...${NC}"
+        exit
+    fi
 fi
 
 # install zsh
@@ -49,9 +50,7 @@ dir=$(dirname "$filepath")
 cp $dir/.zshrc ~/.zshrc
 cp $dir/.vimrc ~/.vimrc
 cp $dir/.p10k.zsh ~/.p10k.zsh
-if [[ ! -e ~/.bash_profile ]];then
-    touch ~/.bash_profile
-fi
+cp $dir/.bash_profile ~/.bash_profile
 
 # setup antigen
 printf "${YELLOW}Setting up antigen for zsh package management\n${NC}"
