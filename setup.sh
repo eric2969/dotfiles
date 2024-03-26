@@ -50,7 +50,7 @@ dir=$(dirname "$filepath")
 cp $dir/.zshrc ~/.zshrc
 cp $dir/.vimrc ~/.vimrc
 cp $dir/.p10k.zsh ~/.p10k.zsh
-cp $dir/.bash_profile  ~/.bash_profile
+cat $dir/.bash_profile >> ~/.bash_profile
 
 # setup antigen
 printf "${YELLOW}Setting up antigen for zsh package management\n${NC}"
