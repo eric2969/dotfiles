@@ -9,6 +9,31 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+
+# Asking insert public keys
+read -rp "Input Your Public Key(input n/N if you don't need): " PUB_KEY
+
+# Checking skipping?
+if [[ "$PUB_KEY" == "n" || "$PUB_KEY" == "N" ]]; then
+    echo "Skipping..."
+# Checking format
+elif [[ "$PUB_KEY" != ssh-* ]]; then
+    echo "❌ Public Key Format invalid (ex: ssh-rsa、ssh-ed25519)"
+# Inserting Public Key into authorized_keys
+else
+    AUTH_KEYS="$HOME/.ssh/authorized_keys"
+    mkdir -p ~/.ssh
+    chmod 700 ~/.ssh
+    touch "$AUTH_KEYS"
+    chmod 600 "$AUTH_KEYS"
+    if ! grep -Fxq "$PUB_KEY" "$AUTH_KEYS"; then
+        echo "$PUB_KEY" >> "$AUTH_KEYS"
+        echo "Public Key Install at ~/.ssh/authorized_keys"
+    else
+        echo "Public Key already exists."
+    fi
+fi
+
 if [[ $1 == "-n" ]]; then
     printf "${RED}Ignoring dependencies install\n${NC}"
 else
@@ -17,11 +42,11 @@ else
         brew install curl git gcc gdb grep;
         brew update;brew upgrade;
     elif [ -x "$(command -v apt)" ]; then # Ubuntu
-        sudo apt install curl git zsh
+        sudo apt install curl git zsh vim vim-gtk3 net-tools tmux htop
     elif [ -x "$(command -v dnf)" ]; then # Fedora
-        sudo dnf install curl git util-linux-user zsh
+        sudo dnf install curl git util-linux-user zsh vim vim-gtk3
     elif [ -x "$(command -v pacman)" ];then #Arch
-        sudo pacman -S curl git zsh
+        sudo pacman -S curl git zsh vim vim-gtk3
     else
         printf "${RED}Unknown os, exiting...${NC}"
         exit
@@ -63,4 +88,3 @@ vim +PluginInstall +qall
 
 # Yay!
 printf "${YELLOW}Finished\nPlease restart your device to apply\n${NC}"
-
