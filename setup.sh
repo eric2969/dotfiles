@@ -75,6 +75,7 @@ dir=$(dirname "$filepath")
 cp $dir/.zshrc ~/.zshrc
 cp $dir/.vimrc ~/.vimrc
 cp $dir/.p10k.zsh ~/.p10k.zsh
+cp $dir/.tmux.conf ~/.tmux.conf
 cat $dir/.bash_profile >> ~/.bash_profile
 
 # setup antigen
