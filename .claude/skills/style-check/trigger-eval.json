@@ -1,0 +1,23 @@
+[
+  {"query": "i just added a new PrintJobCard component in src/components/PrintJobCard.tsx, can you check if it follows the conventions?", "should_trigger": true},
+  {"query": "我剛寫完 src/app/admin/printers/page.tsx，幫我看看有沒有違反 dark mode 或 auth 規範", "should_trigger": true},
+  {"query": "added a new API route at src/app/api/balance/topup/route.ts - please verify auth and SQL placement", "should_trigger": true},
+  {"query": "i think my new component UserProfileCard.tsx might be missing the 'use client' directive - it uses useState", "should_trigger": true},
+  {"query": "updated src/app/api/print-jobs/[id]/cancel/route.ts - need to check if resolveAuth is called first", "should_trigger": true},
+  {"query": "wrote src/app/api/auth/logout/route.ts - does it use getSession correctly?", "should_trigger": true},
+  {"query": "my PrinterListPage.tsx has style={{color: 'red'}} inline - i know that's bad but can you fix it?", "should_trigger": true},
+  {"query": "added a new component src/components/ServiceHoursBanner.tsx - no hooks, just static", "should_trigger": true},
+  {"query": "the new dashboard layout in src/app/dashboard/layout.tsx - does it have proper dark mode classes?", "should_trigger": true},
+  {"query": "src/app/api/admin/users/route.ts 有沒有做 IP 白名單檢查？我忘記加了", "should_trigger": true},
+
+  {"query": "run tsc --noEmit on the whole project", "should_trigger": false},
+  {"query": "check if there are any test coverage gaps in src/lib/pricing.ts", "should_trigger": false},
+  {"query": "我想更新一下 print-dev-check SKILL.md 的 dispatch table", "should_trigger": false},
+  {"query": "are there any npm packages with known CVEs in our project?", "should_trigger": false},
+  {"query": "i updated the NTU brand colors in tailwind.config.ts - looks ok?", "should_trigger": false},
+  {"query": "check if src/lib/balance.ts has proper error handling", "should_trigger": false},
+  {"query": "我改了 src/middleware.ts 的 redirect 邏輯", "should_trigger": false},
+  {"query": "review the git commit history for any accidental secret leaks", "should_trigger": false},
+  {"query": "does next.config.ts have the image domains configured correctly?", "should_trigger": false},
+  {"query": "幫我 review 一下 package.json 的 scripts", "should_trigger": false}
+]

@@ -1,0 +1,23 @@
+[
+  {"query": "i just ran npm install @types/node and package.json got updated - any security issues?", "should_trigger": true},
+  {"query": "upgraded next from 15.1.0 to 16.2.0 in package.json, can you check if there are any CVEs?", "should_trigger": true},
+  {"query": "我們的 @node-saml/node-saml 套件多久沒更新了？有沒有漏洞要修？", "should_trigger": true},
+  {"query": "added pdf-lib and sharp to package.json as new deps - run npm audit please", "should_trigger": true},
+  {"query": "can you check if iron-session is up to date? i heard there was a security advisory", "should_trigger": true},
+  {"query": "package-lock.json was last modified like 2 months ago, should we update our deps?", "should_trigger": true},
+  {"query": "we have 3 high severity vulnerabilities showing up in CI npm audit - which ones?", "should_trigger": true},
+  {"query": "remove the unused lodash dependency from package.json and check if anything breaks", "should_trigger": true},
+  {"query": "react 升到 19.1 了，我們現在用 19.0，需要更新嗎？有沒有 breaking changes?", "should_trigger": true},
+  {"query": "我剛把 devDependencies 裡的 vitest 從 1.x 升到 2.x，幫我確認沒問題", "should_trigger": true},
+
+  {"query": "run the unit tests for the pricing module", "should_trigger": false},
+  {"query": "check if src/lib/auth.ts has proper TypeScript types", "should_trigger": false},
+  {"query": "i added a new React component, can you verify it follows conventions?", "should_trigger": false},
+  {"query": "我剛更新了 .env.example，有沒有問題？", "should_trigger": false},
+  {"query": "can you check if our docker image size is too big?", "should_trigger": false},
+  {"query": "review the SAML configuration in src/lib/saml.ts", "should_trigger": false},
+  {"query": "我修改了 tailwind.config.ts，新增了幾個 custom colors", "should_trigger": false},
+  {"query": "check if we have any circular imports in our codebase", "should_trigger": false},
+  {"query": "does next.config.ts need to be updated for the new image domains?", "should_trigger": false},
+  {"query": "幫我看一下 vitest.config.ts 的設定對不對", "should_trigger": false}
+]

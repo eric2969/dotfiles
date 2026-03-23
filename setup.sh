@@ -58,6 +58,11 @@ if [ ! -x "$(command -v zsh)" ]; then
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && chsh -s $(which zsh)
 fi
 
+# install claude
+if [ ! -x "$(command -v claude)" ]; then
+    sh -c "$(curl -fsSL https://claude.ai/install.sh)"
+fi
+
 chsh -s $(which zsh)
 
 # download Sauce Code Pro Nerd font and build link
@@ -72,6 +77,7 @@ mv "$new_filename" ~/.local/share/fonts
 printf "${YELLOW}Building link to dotfiles${NC}\n"
 filepath=$(realpath "$0")
 dir=$(dirname "$filepath")
+cp $dir/.claude ~/.claude
 cp $dir/.zshrc ~/.zshrc
 cp $dir/.vimrc ~/.vimrc
 cp $dir/.p10k.zsh ~/.p10k.zsh

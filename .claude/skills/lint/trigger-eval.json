@@ -1,0 +1,23 @@
+[
+  {"query": "ok i just fixed the null check bug in src/lib/pricing.ts, can you run lint and type check?", "should_trigger": true},
+  {"query": "我剛把 useSearchParams 加到 PrintJobList.tsx，請幫我確認沒有 TypeScript 錯誤", "should_trigger": true},
+  {"query": "added a new exported function to src/lib/balance.ts - should be fine but please verify types", "should_trigger": true},
+  {"query": "just refactored src/app/api/print-jobs/route.ts - make sure eslint is happy", "should_trigger": true},
+  {"query": "i created a new file src/components/PrinterSelector.tsx, nothing fancy, just a select dropdown", "should_trigger": true},
+  {"query": "updated the session interface in src/lib/session.ts to add a new isVerified field", "should_trigger": true},
+  {"query": "changed src/app/layout.tsx to add the new font import - can you check the tsx is ok?", "should_trigger": true},
+  {"query": "修改了 src/lib/cups.ts 裡的 printJob function，加了 try-catch，幫我跑一下 lint", "should_trigger": true},
+  {"query": "i added process.env.CUPS_HOST to src/app/api/printers/route.ts directly (not in lib), is that ok?", "should_trigger": true},
+  {"query": "finished editing src/middleware.ts to redirect unauthenticated users - please verify no type issues", "should_trigger": true},
+
+  {"query": "run the vitest unit tests for the pricing module", "should_trigger": false},
+  {"query": "check if our npm packages have any known security vulnerabilities", "should_trigger": false},
+  {"query": "我的 docker-compose.yml 有什麼問題嗎？postgres 起不來", "should_trigger": false},
+  {"query": "review this PR - it refactors the authentication flow", "should_trigger": false},
+  {"query": "幫我看一下 tailwind.config.ts 的 theme 設定", "should_trigger": false},
+  {"query": "can you check if we're following the NTU brand colors in our CSS?", "should_trigger": false},
+  {"query": "i updated README.md with the new setup instructions", "should_trigger": false},
+  {"query": "check if the API endpoint returns the correct HTTP status codes", "should_trigger": false},
+  {"query": "我改了 .github/workflows/deploy.yml，幫我看看 CI/CD 流程對不對", "should_trigger": false},
+  {"query": "update the .env.example file with the new CUPS_HOST variable", "should_trigger": false}
+]
