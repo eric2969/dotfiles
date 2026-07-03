@@ -1,5 +1,8 @@
 SHELL := /bin/bash
-CONFIGS := .zshrc .vimrc .p10k.zsh .tmux.conf .bash_profile
+# Wholly repo-owned configs: copied as-is (overwritten on update, removed on uninstall).
+CONFIGS := .vimrc .p10k.zsh .tmux.conf
+# Shell rc files: only the marked block inside them is managed; local edits are kept.
+RC_CONFIGS := .zshrc .bash_profile
 
 .PHONY: install bootstrap update uninstall
 
@@ -12,6 +15,7 @@ bootstrap: ## Install dependencies and tools (zinit, vim-plug, fonts, claude)
 
 update: ## Copy config files into $$HOME (repeatable)
 	cp $(CONFIGS) $(HOME)/
+	@for rc in $(RC_CONFIGS); do ./rcblock.sh install "$$rc" "$(HOME)/$$rc"; done
 	mkdir -p $(HOME)/.claude/skills
 	cp .claude/settings.json .claude/CLAUDE.md .claude/statusline-command.sh $(HOME)/.claude/
 	cp -R .claude/skills/. $(HOME)/.claude/skills/
@@ -19,6 +23,7 @@ update: ## Copy config files into $$HOME (repeatable)
 
 uninstall: ## Remove installed configs and plugin managers (keeps ~/.claude history)
 	rm -f $(addprefix $(HOME)/,$(CONFIGS))
+	@for rc in $(RC_CONFIGS); do ./rcblock.sh remove "$(HOME)/$$rc"; done
 	rm -f $(HOME)/.claude/settings.json $(HOME)/.claude/CLAUDE.md $(HOME)/.claude/statusline-command.sh
 	rm -rf $(HOME)/.claude/skills
 	rm -rf $(HOME)/.vim/plugged $(HOME)/.vim/autoload/plug.vim
