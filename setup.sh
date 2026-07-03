@@ -110,6 +110,27 @@ install_claude() {
     curl -fsSL https://claude.ai/install.sh | sh
 }
 
+install_uv() {
+    if command -v uv >/dev/null 2>&1; then
+        echo "uv already installed."
+        return 0
+    fi
+    info "Installing uv..."
+    # PATH is handled by .bash_profile; keep the installer from editing rc files.
+    curl -fsSL https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
+}
+
+install_nvm() {
+    if [ -d "${NVM_DIR:-$HOME/.nvm}" ]; then
+        echo "nvm already installed."
+        return 0
+    fi
+    info "Installing nvm..."
+    # nvm init lives in .bash_profile; PROFILE=/dev/null stops the installer
+    # from appending its own lines to rc files.
+    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | PROFILE=/dev/null bash
+}
+
 set_default_shell() {
     local zsh_path
     if ! zsh_path=$(command -v zsh); then
@@ -149,6 +170,8 @@ main() {
     install_zinit
     install_vim_plug
     install_claude
+    install_uv
+    install_nvm
     set_default_shell
     ok "Bootstrap finished. Run 'make update' to copy configs, then restart your terminal."
 }

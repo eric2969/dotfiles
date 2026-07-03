@@ -2,7 +2,7 @@
 .SYNOPSIS
     Windows installer for these dotfiles.
 .DESCRIPTION
-    install   - install dependencies (git, vim), Nerd Font, vim-plug, then copy configs
+    install   - install dependencies (git, vim, choco, claude, uv, nvm), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
     uninstall - remove configs installed by this script
 #>
@@ -24,6 +24,43 @@ function Install-Dependencies {
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install Git.Git exited with code $LASTEXITCODE" }
     winget install --id vim.vim -e --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install vim.vim exited with code $LASTEXITCODE" }
+}
+
+function Install-Choco {
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        Write-Host 'Chocolatey already installed.'
+        return
+    }
+    Write-Host 'Installing Chocolatey (requires an elevated shell)...' -ForegroundColor Yellow
+    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+}
+
+function Install-Claude {
+    if (Get-Command claude -ErrorAction SilentlyContinue) {
+        Write-Host 'Claude Code already installed.'
+        return
+    }
+    Write-Host 'Installing Claude Code...' -ForegroundColor Yellow
+    Invoke-RestMethod https://claude.ai/install.ps1 | Invoke-Expression
+}
+
+function Install-Uv {
+    if (Get-Command uv -ErrorAction SilentlyContinue) {
+        Write-Host 'uv already installed.'
+        return
+    }
+    Write-Host 'Installing uv...' -ForegroundColor Yellow
+    Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+}
+
+function Install-Nvm {
+    if (Get-Command nvm -ErrorAction SilentlyContinue) {
+        Write-Host 'nvm already installed.'
+        return
+    }
+    Write-Host 'Installing nvm-windows via Chocolatey...' -ForegroundColor Yellow
+    choco install nvm -y
+    if ($LASTEXITCODE -ne 0) { Write-Warning "choco install nvm exited with code $LASTEXITCODE" }
 }
 
 function Install-NerdFont {
@@ -82,6 +119,10 @@ function Remove-Configs {
 switch ($Action) {
     'install' {
         Install-Dependencies
+        Install-Choco
+        Install-Claude
+        Install-Uv
+        Install-Nvm
         Install-NerdFont
         Install-VimPlug
         Copy-Configs
