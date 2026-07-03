@@ -1,39 +1,38 @@
-" Vundle
-set nocompatible
-filetype off
+" Auto-install vim-plug if missing
+if empty(glob('~/.vim/autoload/plug.vim'))
+  silent !curl -fLo ~/.vim/autoload/plug.vim --create-dirs
+    \ https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+  autocmd VimEnter * PlugInstall --sync | source $MYVIMRC
+endif
 
-set rtp+=~/.vim/bundle/Vundle.vim
-call vundle#begin()
+call plug#begin('~/.vim/plugged')
 
-Plugin 'VundleVim/Vundle.vim'
-Plugin 'scrooloose/nerdtree'
-Plugin 'scrooloose/nerdcommenter'
-Plugin 'Xuyuanp/nerdtree-git-plugin'
-Plugin 'itchyny/lightline.vim'
-Plugin 'Yggdroot/indentLine'
-Plugin 'luochen1990/rainbow'
-Plugin 'alvan/vim-closetag'
-Plugin 'joshdick/onedark.vim'
-Plugin 'octol/vim-cpp-enhanced-highlight'
-Plugin 'gcmt/wildfire.vim'
-Plugin 'sjl/gundo.vim'
-Plugin 'ryanoasis/vim-devicons'
+Plug 'preservim/nerdtree'
+Plug 'preservim/nerdcommenter'
+Plug 'Xuyuanp/nerdtree-git-plugin'
+Plug 'itchyny/lightline.vim'
+Plug 'Yggdroot/indentLine'
+Plug 'luochen1990/rainbow'
+Plug 'alvan/vim-closetag'
+Plug 'joshdick/onedark.vim'
+Plug 'octol/vim-cpp-enhanced-highlight'
+Plug 'gcmt/wildfire.vim'
+Plug 'sjl/gundo.vim'
+Plug 'ryanoasis/vim-devicons'
 
-call vundle#end()
-filetype plugin indent on
+call plug#end()
 
 " for vue highlighting
 au BufRead,BufNewFile *.vue set filetype=typescript
 
 set nu rnu
-set ai
 set mouse=a
 set nowrap
 set ruler cursorline
 set bg=dark
 set autoindent smartindent cindent
 set expandtab smarttab
-set sw=2 sts=2 ts=2
+set tabstop=4 shiftwidth=4 softtabstop=4
 set laststatus=2
 set backspace=2
 set scrolloff=5
@@ -44,10 +43,6 @@ set hls showmatch incsearch ignorecase smartcase
 set splitbelow splitright
 set noshowmode
 set wildmenu
-set smartindent
-set tabstop=4
-set shiftwidth=4
-set expandtab
 
 " set gui options for mvim
 set guicursor+=a:blinkon0
@@ -92,7 +87,7 @@ let g:lightline = {
   \ }
 
 " setup colorscheme
-colorscheme onedark
+silent! colorscheme onedark
 
 hi Normal guibg=NONE ctermbg=NONE
 
@@ -122,7 +117,7 @@ inoremap {<CR> {<CR>}<ESC>ko
 nnoremap <F7> <ESC>:w<CR>:!python %<CR>
 nnoremap <F8> <ESC>:w<CR>:!python3 %<CR>
 nnoremap <F9> <ESC>:w<CR>:!g++-13 -std=c++20 -O2 -Wall -Wextra -Wshadow -o tmp %<CR>
-nnoremap <F11> :!./tmp<CR>
+nnoremap <F10> :!./tmp<CR>
 nnoremap <F11> :!./tmp < in<CR>
 nnoremap c <ESC>:w<CR>:!g++-13 -std=c++20 -O2 -Wall -Wextra -Wshadow -o tmp %<CR>
 nnoremap r <ESC>:!./tmp<CR>
