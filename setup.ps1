@@ -21,12 +21,15 @@ function Install-Dependencies {
     }
     Write-Host 'Installing dependencies via winget...' -ForegroundColor Yellow
     winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) { Write-Warning "winget install Git.Git exited with code $LASTEXITCODE" }
     winget install --id vim.vim -e --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) { Write-Warning "winget install vim.vim exited with code $LASTEXITCODE" }
 }
 
 function Install-NerdFont {
-    $installed = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Fonts" -Filter 'SauceCodePro*.ttf' -ErrorAction SilentlyContinue
-    if ($installed) {
+    $userFonts   = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Fonts" -Filter 'SauceCodePro*.ttf' -ErrorAction SilentlyContinue
+    $systemFonts = Get-ChildItem "$env:windir\Fonts" -Filter 'SauceCodePro*.ttf' -ErrorAction SilentlyContinue
+    if ($userFonts -or $systemFonts) {
         Write-Host 'Nerd Font already installed.'
         return
     }
@@ -72,6 +75,7 @@ function Remove-Configs {
     Remove-Item (Join-Path $ClaudeDir 'skills') -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $env:USERPROFILE 'vimfiles\autoload\plug.vim') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $env:USERPROFILE 'vimfiles\plugged') -Recurse -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $env:USERPROFILE '.vim\plugged') -Recurse -Force -ErrorAction SilentlyContinue
     Write-Host 'Uninstalled. (The rest of ~\.claude was kept.)'
 }
 
