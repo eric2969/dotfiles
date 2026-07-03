@@ -1,34 +1,43 @@
 # Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block, everything else may go below.
-#if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-#  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"#fi
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
 
-source ~/antigen.zsh
+##############################
+#           ZINIT            #
+##############################
 
-antigen use oh-my-zsh
-antigen bundle git
-antigen bundle command-not-found
-antigen bundle zsh-users/zsh-completions
-antigen bundle zsh-users/zsh-autosuggestions
-antigen bundle zsh-users/zsh-syntax-highlighting
-antigen bundle MichaelAquilina/zsh-you-should-use
+ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
+if [[ ! -d "$ZINIT_HOME" ]]; then
+  mkdir -p "$(dirname "$ZINIT_HOME")"
+  git clone --depth 1 https://github.com/zdharma-continuum/zinit.git "$ZINIT_HOME"
+fi
+source "$ZINIT_HOME/zinit.zsh"
 
-antigen theme romkatv/powerlevel10k
+zinit ice depth=1
+zinit light romkatv/powerlevel10k
+
+zinit snippet OMZP::git
+zinit snippet OMZP::command-not-found
+zinit light zsh-users/zsh-completions
+zinit light zsh-users/zsh-autosuggestions
+zinit light MichaelAquilina/zsh-you-should-use
+
+autoload -Uz compinit && compinit
+# syntax-highlighting must load after compinit
+zinit light zsh-users/zsh-syntax-highlighting
 
 ##############################
 #          EXPORTS           #
 ##############################
 
 export TERM="xterm-256color"
-export UPDATE_ZSH_DAYS=7
-export SSH_KEY_PATH="~/.ssh/rsa_id"
+export SSH_KEY_PATH="$HOME/.ssh/id_rsa"
 export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=3"
 export LC_ALL=en_US.UTF-8
 export EDITOR="vim"
 
 # history
-# source: https://unix.stackexchange.com/questions/273861/unlimited-history-in-zsh
 export HISTFILE="$HOME/.zsh_history"
 export HISTSIZE=10000000
 export SAVEHIST=10000000
@@ -40,12 +49,11 @@ setopt HIST_EXPIRE_DUPS_FIRST
 setopt HIST_IGNORE_DUPS
 setopt HIST_FIND_NO_DUPS
 setopt HIST_IGNORE_SPACE
-setopt HIST_IGNORE_SPACE
 setopt HIST_SAVE_NO_DUPS
 setopt HIST_REDUCE_BLANKS
+setopt CORRECT
 
-# `TIME` COMMAND
-
+# `time` command output format
 export TIMEFMT='%J   %U  user %S system %P cpu %*E total'$'\n'\
 'avg shared (code):         %X KB'$'\n'\
 'avg unshared (data/stack): %D KB'$'\n'\
@@ -55,20 +63,11 @@ export TIMEFMT='%J   %U  user %S system %P cpu %*E total'$'\n'\
 'other page faults:         %R'
 
 ##############################
-#         ZSH SETUP          #
-##############################
-
-ENABLE_CORRECTION="true"
-HIST_STAMPS="yyyy-mm-dd"
-
-##############################
 #           SOURCE           #
 ##############################
 
-# aliases here
-source ~/.bash_profile
-
-antigen apply
+# aliases live in .bash_profile so bash sessions get them too
+[[ -f ~/.bash_profile ]] && source ~/.bash_profile
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh

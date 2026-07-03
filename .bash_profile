@@ -1,6 +1,10 @@
 
 alias cls=clear
-alias l="ls -la --color=auto"
+if ls --color=auto / >/dev/null 2>&1; then
+    alias l="ls -la --color=auto"
+else
+    alias l="ls -laG" # BSD ls on older macOS
+fi
 alias ga="git add"
 alias gc="git commit"
 alias gp="git push"
