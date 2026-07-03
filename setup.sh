@@ -1,97 +1,139 @@
-#!/bin/bash
-
-# remove below line if you want to setup
-#exit
-# DEBUG: echo command before execute
-# set -x
+#!/usr/bin/env bash
+set -euo pipefail
 
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 NC='\033[0m'
 
+info()  { printf "${YELLOW}%s${NC}\n" "$*"; }
+warn()  { printf "${RED}%s${NC}\n" "$*" >&2; }
+ok()    { printf "${GREEN}%s${NC}\n" "$*"; }
 
-# Asking insert public keys
-read -rp "Input Your Public Key(input n/N if you don't need): " PUB_KEY
-
-# Checking skipping?
-if [[ "$PUB_KEY" == "n" || "$PUB_KEY" == "N" ]]; then
-    echo "Skipping..."
-# Checking format
-elif [[ "$PUB_KEY" != ssh-* ]]; then
-    echo "❌ Public Key Format invalid (ex: ssh-rsa、ssh-ed25519)"
-# Inserting Public Key into authorized_keys
-else
-    AUTH_KEYS="$HOME/.ssh/authorized_keys"
-    mkdir -p ~/.ssh
-    chmod 700 ~/.ssh
-    touch "$AUTH_KEYS"
-    chmod 600 "$AUTH_KEYS"
-    if ! grep -Fxq "$PUB_KEY" "$AUTH_KEYS"; then
-        echo "$PUB_KEY" >> "$AUTH_KEYS"
-        echo "Public Key Install at ~/.ssh/authorized_keys"
-    else
-        echo "Public Key already exists."
+install_ssh_key() {
+    local pub_key
+    read -rp "Input your SSH public key (n/N to skip): " pub_key
+    if [[ "$pub_key" == [nN] || -z "$pub_key" ]]; then
+        echo "Skipping SSH key setup."
+        return 0
     fi
-fi
-
-if [[ $1 == "-n" ]]; then
-    printf "${RED}Ignoring dependencies install\n${NC}"
-else
-    printf "${YELLOW}Installing dependencies\n${NC}"
-    if [ -x "$(command -v brew)" ]; then # macOS
-        brew install curl git gcc gdb grep;
-        brew update;brew upgrade;
-    elif [ -x "$(command -v apt)" ]; then # Ubuntu
-        sudo apt install curl git zsh vim vim-gtk3 net-tools tmux htop
-    elif [ -x "$(command -v dnf)" ]; then # Fedora
-        sudo dnf install curl git util-linux-user zsh vim vim-gtk3
-    elif [ -x "$(command -v pacman)" ];then #Arch
-        sudo pacman -S curl git zsh vim vim-gtk3
-    else
-        printf "${RED}Unknown os, exiting...${NC}"
-        exit
+    if [[ "$pub_key" != ssh-* ]]; then
+        warn "Invalid public key format (expected ssh-rsa / ssh-ed25519 ...), skipping."
+        return 0
     fi
-fi
+    local auth_keys="$HOME/.ssh/authorized_keys"
+    mkdir -p "$HOME/.ssh"
+    chmod 700 "$HOME/.ssh"
+    touch "$auth_keys"
+    chmod 600 "$auth_keys"
+    if grep -Fxq "$pub_key" "$auth_keys"; then
+        echo "Public key already present."
+    else
+        echo "$pub_key" >> "$auth_keys"
+        ok "Public key added to $auth_keys"
+    fi
+}
 
-# install zsh
-if [ ! -x "$(command -v zsh)" ]; then
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" && chsh -s $(which zsh)
-fi
+install_deps() {
+    info "Installing dependencies..."
+    if command -v brew >/dev/null 2>&1; then      # macOS
+        brew update
+        brew install curl git zsh vim tmux htop
+    elif command -v apt-get >/dev/null 2>&1; then # Debian / Ubuntu
+        sudo apt-get update
+        sudo apt-get install -y curl git zsh vim tmux htop fontconfig unzip
+    elif command -v dnf >/dev/null 2>&1; then     # Fedora
+        sudo dnf install -y curl git zsh vim tmux htop util-linux-user fontconfig unzip
+    elif command -v pacman >/dev/null 2>&1; then  # Arch
+        sudo pacman -S --needed --noconfirm curl git zsh vim tmux htop fontconfig unzip
+    else
+        warn "Unknown OS: no brew/apt/dnf/pacman found."
+        exit 1
+    fi
+}
 
-# install claude
-if [ ! -x "$(command -v claude)" ]; then
-    sh -c "$(curl -fsSL https://claude.ai/install.sh)"
-fi
+install_font() {
+    info "Installing Sauce Code Pro Nerd Font..."
+    if command -v brew >/dev/null 2>&1; then
+        brew install --cask font-sauce-code-pro-nerd-font
+        return 0
+    fi
+    local font_dir="$HOME/.local/share/fonts"
+    if compgen -G "$font_dir/SauceCodePro*.ttf" > /dev/null; then
+        echo "Font already installed."
+        return 0
+    fi
+    local tmp_dir
+    tmp_dir=$(mktemp -d)
+    curl -fsSL -o "$tmp_dir/SourceCodePro.zip" \
+        https://github.com/ryanoasis/nerd-fonts/releases/latest/download/SourceCodePro.zip
+    mkdir -p "$font_dir"
+    unzip -o "$tmp_dir/SourceCodePro.zip" '*.ttf' -d "$font_dir"
+    rm -rf "$tmp_dir"
+    if command -v fc-cache >/dev/null 2>&1; then
+        fc-cache -f "$font_dir"
+    fi
+}
 
-chsh -s $(which zsh)
+install_zinit() {
+    local zinit_home="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
+    if [ -d "$zinit_home" ]; then
+        echo "zinit already installed."
+        return 0
+    fi
+    info "Installing zinit..."
+    mkdir -p "$(dirname "$zinit_home")"
+    git clone --depth 1 https://github.com/zdharma-continuum/zinit.git "$zinit_home"
+}
 
-# download Sauce Code Pro Nerd font and build link
-mkdir -p ~/.local/share/fonts
-curl -LO https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/SourceCodePro/Regular/complete/Sauce%20Code%20Pro%20Nerd%20Font%20Complete%20Mono.ttf
-old_filename=`ls | grep ttf`
-new_filename=`echo $old_filename | sed "s/%20/ /g"`
-mv "$old_filename" "$new_filename"
-mv "$new_filename" ~/.local/share/fonts
+install_vim_plug() {
+    local plug="$HOME/.vim/autoload/plug.vim"
+    if [ -f "$plug" ]; then
+        echo "vim-plug already installed."
+        return 0
+    fi
+    info "Installing vim-plug..."
+    curl -fsSLo "$plug" --create-dirs \
+        https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+}
 
-# build link
-printf "${YELLOW}Building link to dotfiles${NC}\n"
-filepath=$(realpath "$0")
-dir=$(dirname "$filepath")
-cp $dir/.claude ~/.claude
-cp $dir/.zshrc ~/.zshrc
-cp $dir/.vimrc ~/.vimrc
-cp $dir/.p10k.zsh ~/.p10k.zsh
-cp $dir/.tmux.conf ~/.tmux.conf
-cat $dir/.bash_profile >> ~/.bash_profile
+install_claude() {
+    if command -v claude >/dev/null 2>&1; then
+        echo "Claude Code already installed."
+        return 0
+    fi
+    info "Installing Claude Code..."
+    curl -fsSL https://claude.ai/install.sh | sh
+}
 
-# setup antigen
-printf "${YELLOW}Setting up antigen for zsh package management\n${NC}"
-curl -sL git.io/antigen > ~/antigen.zsh
+set_default_shell() {
+    local zsh_path
+    zsh_path=$(command -v zsh)
+    if [ "${SHELL:-}" = "$zsh_path" ]; then
+        echo "zsh is already the default shell."
+        return 0
+    fi
+    info "Changing default shell to zsh (your password may be required)..."
+    chsh -s "$zsh_path"
+}
 
-# setup Vundle
-printf "${YELLOW}Setting up Vundle for vim package management\n${NC}"
-git clone https://github.com/VundleVim/Vundle.vim.git ~/.vim/bundle/Vundle.vim
-vim +PluginInstall +qall
+main() {
+    local skip_deps=false
+    if [ "${1:-}" = "-n" ]; then
+        skip_deps=true
+    fi
+    install_ssh_key
+    if [ "$skip_deps" = true ]; then
+        warn "Skipping dependency installation (-n)"
+    else
+        install_deps
+    fi
+    install_font
+    install_zinit
+    install_vim_plug
+    install_claude
+    set_default_shell
+    ok "Bootstrap finished. Run 'make update' to copy configs, then restart your terminal."
+}
 
-# Yay!
-printf "${YELLOW}Finished\nPlease restart your device to apply\n${NC}"
+main "$@"
