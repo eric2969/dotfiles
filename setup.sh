@@ -42,14 +42,14 @@ install_deps() {
     info "Installing dependencies..."
     if command -v brew >/dev/null 2>&1; then      # macOS
         brew update
-        brew install curl git zsh vim tmux htop
+        brew install curl git zsh vim tmux htop gcc
     elif command -v apt-get >/dev/null 2>&1; then # Debian / Ubuntu
         sudo apt-get update
-        sudo apt-get install -y curl git zsh vim tmux htop fontconfig unzip
+        sudo apt-get install -y curl git zsh vim tmux htop fontconfig unzip build-essential
     elif command -v dnf >/dev/null 2>&1; then     # Fedora
-        sudo dnf install -y curl git zsh vim tmux htop util-linux-user fontconfig unzip
+        sudo dnf install -y curl git zsh vim tmux htop util-linux-user fontconfig unzip gcc-c++
     elif command -v pacman >/dev/null 2>&1; then  # Arch
-        sudo pacman -S --needed --noconfirm curl git zsh vim tmux htop fontconfig unzip
+        sudo pacman -S --needed --noconfirm curl git zsh vim tmux htop fontconfig unzip base-devel
     else
         warn "Unknown OS: no brew/apt/dnf/pacman found."
         exit 1
@@ -115,6 +115,13 @@ set_default_shell() {
     if ! zsh_path=$(command -v zsh); then
         warn "zsh not found on PATH, skipping default shell change."
         return 0
+    fi
+    if ! grep -qxF "$zsh_path" /etc/shells 2>/dev/null; then
+        if grep -qxF /bin/zsh /etc/shells 2>/dev/null; then
+            zsh_path=/bin/zsh
+        else
+            echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null
+        fi
     fi
     if [ "${SHELL:-}" = "$zsh_path" ]; then
         echo "zsh is already the default shell."
