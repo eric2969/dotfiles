@@ -31,11 +31,8 @@ zinit light zsh-users/zsh-syntax-highlighting
 #          EXPORTS           #
 ##############################
 
-export TERM="xterm-256color"
-export SSH_KEY_PATH="$HOME/.ssh/id_rsa"
+# shared env vars (TERM, EDITOR, ...) live in .bash_profile, sourced below
 export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=3"
-export LC_ALL=en_US.UTF-8
-export EDITOR="vim"
 
 # history
 export HISTFILE="$HOME/.zsh_history"
