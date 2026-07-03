@@ -120,7 +120,10 @@ set_default_shell() {
         if grep -qxF /bin/zsh /etc/shells 2>/dev/null; then
             zsh_path=/bin/zsh
         else
-            echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null
+            if ! echo "$zsh_path" | sudo tee -a /etc/shells >/dev/null; then
+                warn "Could not register $zsh_path in /etc/shells, skipping default shell change."
+                return 0
+            fi
         fi
     fi
     if [ "${SHELL:-}" = "$zsh_path" ]; then
