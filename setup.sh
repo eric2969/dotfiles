@@ -11,6 +11,10 @@ warn()  { printf "${RED}%s${NC}\n" "$*" >&2; }
 ok()    { printf "${GREEN}%s${NC}\n" "$*"; }
 
 install_ssh_key() {
+    if [ ! -t 0 ]; then
+        echo "Non-interactive session, skipping SSH key setup."
+        return 0
+    fi
     local pub_key
     read -rp "Input your SSH public key (n/N to skip): " pub_key
     if [[ "$pub_key" == [nN] || -z "$pub_key" ]]; then
@@ -108,7 +112,10 @@ install_claude() {
 
 set_default_shell() {
     local zsh_path
-    zsh_path=$(command -v zsh)
+    if ! zsh_path=$(command -v zsh); then
+        warn "zsh not found on PATH, skipping default shell change."
+        return 0
+    fi
     if [ "${SHELL:-}" = "$zsh_path" ]; then
         echo "zsh is already the default shell."
         return 0
