@@ -18,14 +18,25 @@ update: ## Copy config files into $$HOME (repeatable)
 	@for rc in $(RC_CONFIGS); do ./rcblock.sh install "$$rc" "$(HOME)/$$rc"; done
 	mkdir -p $(HOME)/.claude/skills
 	cp .claude/settings.json .claude/CLAUDE.md .claude/statusline-command.sh $(HOME)/.claude/
-	cp -R .claude/skills/. $(HOME)/.claude/skills/
+	@for skill in .claude/skills/*/; do \
+		name=$$(basename "$$skill"); \
+		if [ -d "$(HOME)/.claude/skills/$$name" ]; then \
+			echo "Skill '$$name' already installed, skipping."; \
+		else \
+			cp -R "$$skill" "$(HOME)/.claude/skills/$$name"; \
+			echo "Skill '$$name' installed."; \
+		fi; \
+	done
 	@echo "Configs updated."
 
 uninstall: ## Remove installed configs and plugin managers (keeps ~/.claude history)
 	rm -f $(addprefix $(HOME)/,$(CONFIGS))
 	@for rc in $(RC_CONFIGS); do ./rcblock.sh remove "$(HOME)/$$rc"; done
 	rm -f $(HOME)/.claude/settings.json $(HOME)/.claude/CLAUDE.md $(HOME)/.claude/statusline-command.sh
-	rm -rf $(HOME)/.claude/skills
+	@for skill in .claude/skills/*/; do \
+		rm -rf "$(HOME)/.claude/skills/$$(basename "$$skill")"; \
+	done
+	@rmdir "$(HOME)/.claude/skills" 2>/dev/null || true
 	rm -rf $(HOME)/.vim/plugged $(HOME)/.vim/autoload/plug.vim
 	rm -rf $${XDG_DATA_HOME:-$(HOME)/.local/share}/zinit
 	@echo "Uninstalled. (~/.zsh_history and the rest of ~/.claude were kept.)"

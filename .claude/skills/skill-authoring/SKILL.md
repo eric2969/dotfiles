@@ -12,6 +12,10 @@ description: >-
 
 # Skill Authoring
 
+> ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/skill-authoring/SKILL.md`.
+> Update it there and sync with `make update` (macOS/Linux) or `./setup.ps1 update` (Windows).
+> Sync skips skills already present in `~/.claude/skills/` — remove the old copy to pick up changes.
+
 **Purpose:** Enforce a consistent, high-quality standard when authoring or updating any
 skill file across all projects.
 
@@ -73,7 +77,8 @@ inline `**Trigger:**` and `**Purpose:**` format is deprecated — move these int
    ```
    > ⚠️ This skill is version-controlled in `.claude/skills/<name>/SKILL.md`.
    > When project conventions change, update this file in the same PR.
-   > To sync to your user layer: run `scripts/setup-skills.sh`.
+   > To sync to your user layer: run the project's sync command
+   > (in the dotfiles repo: `make update` or `./setup.ps1 update`).
    ```
 
 7. **User-layer generics use placeholders**: user-layer skills must not contain
@@ -96,8 +101,10 @@ inline `**Trigger:**` and `**Purpose:**` format is deprecated — move these int
 4. **Project-layer update rule**: if the updated skill lives in `.claude/skills/`, the
    update must be in the same PR as the convention change that prompted it.
 
-5. **Sync user-layer**: after updating a project-layer skill, run `scripts/setup-skills.sh`
-   to update the user-layer copy.
+5. **Sync user-layer**: after updating a project-layer skill, run the project's sync
+   command (in the dotfiles repo: `make update` or `./setup.ps1 update`) to update the
+   user-layer copy. Note: sync skips skills that already exist in `~/.claude/skills/`,
+   so remove the old user-layer copy first when you need to pick up changes.
 
 ---
 
@@ -110,6 +117,7 @@ inline `**Trigger:**` and `**Purpose:**` format is deprecated — move these int
 
 ---
 
-**Pass criteria:** The skill file has all four mandatory sections (Trigger, Purpose, Actions,
-Pass criteria), an unambiguous trigger, 🔴/🟡 labels on every check, and a testable
-pass criterion.
+**Pass criteria:** The skill file has YAML frontmatter with `name` and an unambiguous,
+trigger-bearing `description`, plus Purpose, Actions, and Pass criteria sections in the
+body; every check carries a 🔴/🟡 label; the pass criterion is testable; and
+project-layer skills carry the sync notice.

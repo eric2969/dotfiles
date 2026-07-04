@@ -32,6 +32,12 @@ Current skills:
 | Skill | Trigger keywords |
 |-------|-----------------|
 | `skill-authoring` | "寫一個 skill", "新增 skill", "更新 skill", "create skill", "update skill", "write skill", "review skill", "check skill" |
+| `lint` | "run lint", "check types", "跑 lint", "確認沒有 TypeScript 錯誤", "make sure eslint is happy" |
+| `test` | "run tests", "tests still passing?", "跑一下測試", "do I need to add tests" |
+| `style-check` | "follows the conventions?", "check my new component", "有沒有違反規範", "verify auth" |
+| `deps-check` | "any security issues?", "check for CVEs", "npm audit", "有沒有漏洞", "should we update our deps" |
+
+(The table is a quick index — each skill's `description` frontmatter is the source of truth.)
 
 ### Rules
 

@@ -94,13 +94,28 @@ function Install-VimPlug {
     Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim' -OutFile $plug
 }
 
+function Copy-Skills {
+    # Install each skill only if not already present, so local edits are kept.
+    $skillsDir = Join-Path $ClaudeDir 'skills'
+    New-Item -ItemType Directory -Force -Path $skillsDir | Out-Null
+    Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory | ForEach-Object {
+        $dest = Join-Path $skillsDir $_.Name
+        if (Test-Path $dest) {
+            Write-Host "Skill '$($_.Name)' already installed, skipping."
+        } else {
+            Copy-Item $_.FullName $dest -Recurse
+            Write-Host "Skill '$($_.Name)' installed."
+        }
+    }
+}
+
 function Copy-Configs {
     Write-Host 'Copying configs...' -ForegroundColor Yellow
     Copy-Item (Join-Path $RepoRoot '.vimrc') (Join-Path $env:USERPROFILE '_vimrc') -Force
     New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
     Copy-Item (Join-Path $RepoRoot '.claude\settings.json') $ClaudeDir -Force
     Copy-Item (Join-Path $RepoRoot '.claude\CLAUDE.md') $ClaudeDir -Force
-    Copy-Item (Join-Path $RepoRoot '.claude\skills') $ClaudeDir -Recurse -Force
+    Copy-Skills
     Write-Host 'Configs updated.'
 }
 
@@ -109,7 +124,14 @@ function Remove-Configs {
     Remove-Item (Join-Path $env:USERPROFILE '_vimrc') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $ClaudeDir 'settings.json') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $ClaudeDir 'CLAUDE.md') -Force -ErrorAction SilentlyContinue
-    Remove-Item (Join-Path $ClaudeDir 'skills') -Recurse -Force -ErrorAction SilentlyContinue
+    # Only remove skills managed by this repo; keep user-authored skills.
+    Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory | ForEach-Object {
+        Remove-Item (Join-Path $ClaudeDir "skills\$($_.Name)") -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    $skillsDir = Join-Path $ClaudeDir 'skills'
+    if ((Test-Path $skillsDir) -and -not (Get-ChildItem $skillsDir)) {
+        Remove-Item $skillsDir -Force
+    }
     Remove-Item (Join-Path $env:USERPROFILE 'vimfiles\autoload\plug.vim') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $env:USERPROFILE 'vimfiles\plugged') -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $env:USERPROFILE '.vim\plugged') -Recurse -Force -ErrorAction SilentlyContinue
