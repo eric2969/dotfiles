@@ -3,8 +3,14 @@ SHELL := /bin/bash
 CONFIGS := .vimrc .p10k.zsh .tmux.conf
 # Shell rc files: only the marked block inside them is managed; local edits are kept.
 RC_CONFIGS := .zshrc .bash_profile
+# FORCE=1 overwrites locally modified skills on update.
+FORCE ?= 0
 
-.PHONY: install bootstrap update uninstall
+.DEFAULT_GOAL := help
+.PHONY: help install bootstrap update uninstall test
+
+help: ## Show available targets
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "} {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
 
 install: bootstrap update ## Full install: deps + tools + configs + vim plugins
 	vim +PlugInstall +qall
@@ -16,27 +22,19 @@ bootstrap: ## Install dependencies and tools (zinit, vim-plug, fonts, claude)
 update: ## Copy config files into $$HOME (repeatable)
 	cp $(CONFIGS) $(HOME)/
 	@for rc in $(RC_CONFIGS); do ./rcblock.sh install "$$rc" "$(HOME)/$$rc"; done
-	mkdir -p $(HOME)/.claude/skills
+	mkdir -p $(HOME)/.claude
 	cp .claude/settings.json .claude/CLAUDE.md .claude/statusline-command.sh $(HOME)/.claude/
-	@for skill in .claude/skills/*/; do \
-		name=$$(basename "$$skill"); \
-		if [ -d "$(HOME)/.claude/skills/$$name" ]; then \
-			echo "Skill '$$name' already installed, skipping."; \
-		else \
-			cp -R "$$skill" "$(HOME)/.claude/skills/$$name"; \
-			echo "Skill '$$name' installed."; \
-		fi; \
-	done
+	./skills-sync.sh install .claude/skills "$(HOME)/.claude/skills" "$(FORCE)"
 	@echo "Configs updated."
 
 uninstall: ## Remove installed configs and plugin managers (keeps ~/.claude history)
 	rm -f $(addprefix $(HOME)/,$(CONFIGS))
 	@for rc in $(RC_CONFIGS); do ./rcblock.sh remove "$(HOME)/$$rc"; done
 	rm -f $(HOME)/.claude/settings.json $(HOME)/.claude/CLAUDE.md $(HOME)/.claude/statusline-command.sh
-	@for skill in .claude/skills/*/; do \
-		rm -rf "$(HOME)/.claude/skills/$$(basename "$$skill")"; \
-	done
-	@rmdir "$(HOME)/.claude/skills" 2>/dev/null || true
+	./skills-sync.sh remove .claude/skills "$(HOME)/.claude/skills"
 	rm -rf $(HOME)/.vim/plugged $(HOME)/.vim/autoload/plug.vim
 	rm -rf $${XDG_DATA_HOME:-$(HOME)/.local/share}/zinit
 	@echo "Uninstalled. (~/.zsh_history and the rest of ~/.claude were kept.)"
+
+test: ## Run the sandboxed test suite
+	./tests/test.sh

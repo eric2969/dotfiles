@@ -13,7 +13,7 @@ description: >-
 
 > ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/deps-check/SKILL.md`.
 > Update it there and sync with `make update` (macOS/Linux) or `./setup.ps1 update` (Windows).
-> Sync skips skills already present in `~/.claude/skills/` — remove the old copy to pick up changes.
+> Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
 
 **Purpose:** Keep dependency changes safe by auditing for known vulnerabilities and
 flagging risky upgrades.

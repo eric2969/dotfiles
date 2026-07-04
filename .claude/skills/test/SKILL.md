@@ -12,7 +12,7 @@ description: >-
 
 > ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/test/SKILL.md`.
 > Update it there and sync with `make update` (macOS/Linux) or `./setup.ps1 update` (Windows).
-> Sync skips skills already present in `~/.claude/skills/` — remove the old copy to pick up changes.
+> Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
 
 **Purpose:** Verify changed logic with unit tests immediately, and ensure new exported
 behavior is covered by meaningful tests.

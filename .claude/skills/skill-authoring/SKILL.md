@@ -14,7 +14,7 @@ description: >-
 
 > ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/skill-authoring/SKILL.md`.
 > Update it there and sync with `make update` (macOS/Linux) or `./setup.ps1 update` (Windows).
-> Sync skips skills already present in `~/.claude/skills/` — remove the old copy to pick up changes.
+> Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
 
 **Purpose:** Enforce a consistent, high-quality standard when authoring or updating any
 skill file across all projects.
@@ -103,8 +103,8 @@ inline `**Trigger:**` and `**Purpose:**` format is deprecated — move these int
 
 5. **Sync user-layer**: after updating a project-layer skill, run the project's sync
    command (in the dotfiles repo: `make update` or `./setup.ps1 update`) to update the
-   user-layer copy. Note: sync skips skills that already exist in `~/.claude/skills/`,
-   so remove the old user-layer copy first when you need to pick up changes.
+   user-layer copy. Sync auto-updates unmodified user-layer copies; copies you edited
+   locally are kept unless you pass `FORCE=1` (make) / `-Force` (setup.ps1).
 
 ---
 

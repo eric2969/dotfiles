@@ -8,7 +8,11 @@
 #>
 param(
     [ValidateSet('install', 'update', 'uninstall')]
-    [string]$Action = 'install'
+    [string]$Action = 'install',
+    # Overwrite locally modified skills on update (mirrors FORCE=1 for make).
+    [switch]$Force,
+    # Skip winget dependency installation (mirrors setup.sh -n).
+    [switch]$SkipDeps
 )
 
 $ErrorActionPreference = 'Stop'
@@ -94,19 +98,64 @@ function Install-VimPlug {
     Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim' -OutFile $plug
 }
 
-function Copy-Skills {
-    # Install each skill only if not already present, so local edits are kept.
-    $skillsDir = Join-Path $ClaudeDir 'skills'
-    New-Item -ItemType Directory -Force -Path $skillsDir | Out-Null
-    Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory | ForEach-Object {
-        $dest = Join-Path $skillsDir $_.Name
-        if (Test-Path $dest) {
-            Write-Host "Skill '$($_.Name)' already installed, skipping."
-        } else {
-            Copy-Item $_.FullName $dest -Recurse
-            Write-Host "Skill '$($_.Name)' installed."
+# A content-hash manifest tells apart "user modified the installed copy" (kept)
+# from "installed copy is just an older repo version" (updated).
+$SkillsDir = Join-Path $ClaudeDir 'skills'
+$ManifestPath = Join-Path $SkillsDir '.dotfiles-manifest'
+
+function Get-SkillHash([string]$Dir) {
+    $sb = [System.Text.StringBuilder]::new()
+    Get-ChildItem $Dir -Recurse -File | Sort-Object FullName | ForEach-Object {
+        [void]$sb.AppendLine($_.FullName.Substring($Dir.Length))
+        [void]$sb.AppendLine((Get-FileHash $_.FullName -Algorithm SHA256).Hash)
+    }
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($sb.ToString())
+    $hash = [System.Security.Cryptography.SHA256]::Create().ComputeHash($bytes)
+    ([System.BitConverter]::ToString($hash) -replace '-', '').ToLower()
+}
+
+function Get-Manifest {
+    $manifest = @{}
+    if (Test-Path $ManifestPath) {
+        Get-Content $ManifestPath | ForEach-Object {
+            $parts = $_ -split ' ', 2
+            if ($parts.Count -eq 2) { $manifest[$parts[0]] = $parts[1] }
         }
     }
+    $manifest
+}
+
+function Save-Manifest($Manifest) {
+    $Manifest.GetEnumerator() | Sort-Object Key |
+        ForEach-Object { "$($_.Key) $($_.Value)" } | Set-Content $ManifestPath
+}
+
+function Copy-Skills {
+    New-Item -ItemType Directory -Force -Path $SkillsDir | Out-Null
+    $manifest = Get-Manifest
+    Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory | ForEach-Object {
+        $dest = Join-Path $SkillsDir $_.Name
+        $repoHash = Get-SkillHash $_.FullName
+        if (-not (Test-Path $dest)) {
+            Copy-Item $_.FullName $dest -Recurse
+            $manifest[$_.Name] = $repoHash
+            Write-Host "Skill '$($_.Name)' installed."
+            return
+        }
+        $curHash = Get-SkillHash $dest
+        if ($curHash -eq $repoHash) {
+            $manifest[$_.Name] = $repoHash
+            Write-Host "Skill '$($_.Name)' up to date."
+        } elseif ($Force -or $curHash -eq $manifest[$_.Name]) {
+            Remove-Item $dest -Recurse -Force
+            Copy-Item $_.FullName $dest -Recurse
+            $manifest[$_.Name] = $repoHash
+            Write-Host "Skill '$($_.Name)' updated."
+        } else {
+            Write-Warning "Skill '$($_.Name)' modified locally, keeping it (use -Force to overwrite)."
+        }
+    }
+    Save-Manifest $manifest
 }
 
 function Copy-Configs {
@@ -124,13 +173,22 @@ function Remove-Configs {
     Remove-Item (Join-Path $env:USERPROFILE '_vimrc') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $ClaudeDir 'settings.json') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $ClaudeDir 'CLAUDE.md') -Force -ErrorAction SilentlyContinue
-    # Only remove skills managed by this repo; keep user-authored skills.
+    # Only remove repo-managed skills; keep user-authored or user-modified ones.
+    $manifest = Get-Manifest
     Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory | ForEach-Object {
-        Remove-Item (Join-Path $ClaudeDir "skills\$($_.Name)") -Recurse -Force -ErrorAction SilentlyContinue
+        $dest = Join-Path $SkillsDir $_.Name
+        if (-not (Test-Path $dest)) { return }
+        $curHash = Get-SkillHash $dest
+        if ($curHash -eq $manifest[$_.Name] -or $curHash -eq (Get-SkillHash $_.FullName)) {
+            Remove-Item $dest -Recurse -Force
+            Write-Host "Skill '$($_.Name)' removed."
+        } else {
+            Write-Warning "Skill '$($_.Name)' modified locally, keeping it."
+        }
     }
-    $skillsDir = Join-Path $ClaudeDir 'skills'
-    if ((Test-Path $skillsDir) -and -not (Get-ChildItem $skillsDir)) {
-        Remove-Item $skillsDir -Force
+    Remove-Item $ManifestPath -Force -ErrorAction SilentlyContinue
+    if ((Test-Path $SkillsDir) -and -not (Get-ChildItem $SkillsDir -Force)) {
+        Remove-Item $SkillsDir -Force
     }
     Remove-Item (Join-Path $env:USERPROFILE 'vimfiles\autoload\plug.vim') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $env:USERPROFILE 'vimfiles\plugged') -Recurse -Force -ErrorAction SilentlyContinue
@@ -140,7 +198,11 @@ function Remove-Configs {
 
 switch ($Action) {
     'install' {
-        Install-Dependencies
+        if ($SkipDeps) {
+            Write-Warning 'Skipping dependency installation (-SkipDeps)'
+        } else {
+            Install-Dependencies
+        }
         Install-Choco
         Install-Claude
         Install-Uv
