@@ -13,11 +13,19 @@ make install
 
 | Command | What it does |
 |---------|--------------|
+| `make` / `make help` | List available targets |
 | `make install` | Install dependencies + tools, copy configs, install vim plugins |
-| `make update` | Copy configs into `$HOME` only (re-run any time) |
+| `make update` | Copy configs into `$HOME` only (re-run any time); `FORCE=1` overwrites locally modified skills |
 | `make uninstall` | Remove installed configs and plugin managers |
+| `make test` | Run the sandboxed test suite (never touches your real `$HOME`) |
 
-**Note:** `~/.zshrc` and `~/.bash_profile` are managed via a marked block (`# >>> dotfiles managed block >>> … # <<< dotfiles managed block <<<`): `make update` rewrites only that block and `make uninstall` removes only that block, so your own lines outside the markers are always kept. The other configs (`~/.vimrc`, `~/.p10k.zsh`, `~/.tmux.conf`) are wholly repo-owned and still fully overwritten — edit those in the repo.
+**How each config is managed on update / uninstall:**
+
+| Files | Policy |
+|-------|--------|
+| `~/.vimrc`, `~/.p10k.zsh`, `~/.tmux.conf`, `~/.claude/settings.json`, `~/.claude/CLAUDE.md`, `~/.claude/statusline-command.sh` | Wholly repo-owned: overwritten on update, removed on uninstall — edit them in the repo |
+| `~/.zshrc`, `~/.bash_profile` | Block-managed: only the marked block (`# >>> dotfiles managed block >>> … <<<`) is rewritten/removed; your own lines are always kept |
+| `~/.claude/skills/*` | Manifest-managed: unmodified skills auto-update, skills you edited locally are kept (use `FORCE=1` to overwrite); uninstall also keeps modified and user-authored skills |
 
 To skip OS package installation, run the bootstrap directly: `./setup.sh -n`.
 
@@ -25,10 +33,14 @@ To skip OS package installation, run the bootstrap directly: `./setup.sh -n`.
 
 ```powershell
 git clone https://github.com/eric2969/dotfiles.git; cd dotfiles
-.\setup.ps1                      # install
-.\setup.ps1 -Action update      # copy configs only
-.\setup.ps1 -Action uninstall   # remove
+.\setup.ps1                          # install
+.\setup.ps1 -SkipDeps                # install without winget packages
+.\setup.ps1 -Action update           # copy configs only
+.\setup.ps1 -Action update -Force    # also overwrite locally modified skills
+.\setup.ps1 -Action uninstall        # remove
 ```
+
+Skills follow the same manifest policy as on Unix: unmodified copies auto-update, locally modified copies are kept unless `-Force` is given.
 
 Windows installs git/vim (winget), Chocolatey, Claude Code, uv, nvm-windows (choco), the Nerd Font, vim-plug, `_vimrc`, and Claude Code settings. zsh/tmux configs are Unix-only. Run the install from an elevated PowerShell (Chocolatey needs admin).
 
@@ -36,8 +48,10 @@ Windows installs git/vim (winget), Chocolatey, Claude Code, uv, nvm-windows (cho
 
 - `setup.sh` — Unix bootstrapper: OS packages, Sauce Code Pro Nerd Font, zinit, vim-plug, Claude Code, uv, nvm, default shell
 - `rcblock.sh` — manages the marked dotfiles block inside `~/.zshrc` / `~/.bash_profile`
+- `skills-sync.sh` — manifest-based sync of Claude Code skills into `~/.claude/skills`
 - `setup.ps1` — Windows installer
-- `Makefile` — install / update / uninstall entry points
+- `Makefile` — help / install / update / uninstall / test entry points
+- `tests/test.sh` — sandboxed test suite (also run in CI together with shellcheck and a Windows smoke test)
 - `.zshrc` — zsh-only layer (see below)
 - `.bash_profile` — shared shell layer (see below)
 - `.vimrc` — vim-plug plugins
