@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  unix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck setup.sh rcblock.sh skills-sync.sh tests/test.sh
+      - name: test suite
+        run: make test
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: parse and analyze setup.ps1
+        shell: pwsh
+        run: |
+          $null = [System.Management.Automation.Language.Parser]::ParseFile("$PWD\setup.ps1", [ref]$null, [ref]$errors)
+          if ($errors) { $errors; exit 1 }
+          Install-Module PSScriptAnalyzer -Force -Scope CurrentUser
+          $findings = Invoke-ScriptAnalyzer -Path setup.ps1 -Severity Error
+          if ($findings) { $findings; exit 1 }
+      - name: smoke test update + uninstall in fake home
+        shell: pwsh
+        run: |
+          $fake = Join-Path $env:RUNNER_TEMP 'fakehome'
+          $env:USERPROFILE = $fake
+          New-Item -ItemType Directory -Force -Path "$fake\.claude\skills\my-own-skill" | Out-Null
+          Set-Content "$fake\.claude\skills\my-own-skill\SKILL.md" 'mine'
+          .\setup.ps1 -Action update
+          if (-not (Test-Path "$fake\.claude\skills\skill-authoring\SKILL.md")) { throw 'skill not installed' }
+          $out = .\setup.ps1 -Action update | Out-String
+          if ($out -notmatch 'up to date') { throw "second update did not report up to date: $out" }
+          .\setup.ps1 -Action uninstall
+          if (Test-Path "$fake\.claude\skills\skill-authoring") { throw 'repo skill not removed' }
+          if (-not (Test-Path "$fake\.claude\skills\my-own-skill\SKILL.md")) { throw 'user skill was deleted' }
