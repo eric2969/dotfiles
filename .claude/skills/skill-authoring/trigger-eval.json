@@ -1,0 +1,10 @@
+[
+  {"query": "幫我寫一個 skill 來管理 commit message 格式", "should_trigger": true},
+  {"query": "can you review this SKILL.md and tell me if the format is correct?", "should_trigger": true},
+  {"query": "更新 lint skill，加上 biome 的支援", "should_trigger": true},
+  {"query": "create a new skill that runs the deploy checklist", "should_trigger": true},
+  {"query": "skill 的 frontmatter 要怎麼寫？", "should_trigger": true},
+  {"query": "run lint on my latest changes", "should_trigger": false},
+  {"query": "幫我跑測試確認沒壞", "should_trigger": false},
+  {"query": "check our dependencies for CVEs", "should_trigger": false}
+]

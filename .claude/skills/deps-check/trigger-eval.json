@@ -1,0 +1,10 @@
+[
+  {"query": "i just added two packages to package.json - any security issues?", "should_trigger": true},
+  {"query": "upgraded the framework a major version, can you check if there are any CVEs?", "should_trigger": true},
+  {"query": "我們的套件多久沒更新了？有沒有漏洞要修？", "should_trigger": true},
+  {"query": "CI 的 npm audit 冒出 3 個 high severity，是哪幾個？", "should_trigger": true},
+  {"query": "remove the unused lodash dependency and check if anything breaks", "should_trigger": true},
+  {"query": "run the unit tests for the pricing module", "should_trigger": false},
+  {"query": "check that my new route has the auth guard", "should_trigger": false},
+  {"query": "make sure eslint passes after my refactor", "should_trigger": false}
+]

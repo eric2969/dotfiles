@@ -1,0 +1,10 @@
+[
+  {"query": "i just added a new card component, can you check if it follows the conventions?", "should_trigger": true},
+  {"query": "我剛寫完 admin page，幫我看看有沒有違反 dark mode 或 auth 規範", "should_trigger": true},
+  {"query": "added a new API route - please verify auth and directory placement", "should_trigger": true},
+  {"query": "my new component uses useState, is it missing the 'use client' directive?", "should_trigger": true},
+  {"query": "the component has style={{color: 'red'}} inline - i know that's bad, can you fix it?", "should_trigger": true},
+  {"query": "run tsc --noEmit on the whole project", "should_trigger": false},
+  {"query": "幫我跑一下單元測試", "should_trigger": false},
+  {"query": "is our lodash dependency still needed?", "should_trigger": false}
+]
