@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+NVM_VERSION=v0.40.3
+
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -39,6 +41,18 @@ install_ssh_key() {
 }
 
 install_deps() {
+    # Fast path: skip the package manager entirely when everything is present.
+    local tool missing=false
+    for tool in curl git zsh vim tmux htop; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            missing=true
+            break
+        fi
+    done
+    if [ "$missing" = false ]; then
+        echo "Dependencies already installed."
+        return 0
+    fi
     info "Installing dependencies..."
     if command -v brew >/dev/null 2>&1; then      # macOS
         brew update
@@ -128,7 +142,7 @@ install_nvm() {
     info "Installing nvm..."
     # nvm init lives in .bash_profile; PROFILE=/dev/null stops the installer
     # from appending its own lines to rc files.
-    curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | PROFILE=/dev/null bash
+    curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash
 }
 
 set_default_shell() {
