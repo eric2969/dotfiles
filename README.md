@@ -51,7 +51,7 @@ Windows installs git/vim (winget), Chocolatey, Claude Code, uv, nvm-windows (cho
 - `skills-sync.sh` — manifest-based sync of Claude Code skills into `~/.claude/skills`
 - `setup.ps1` — Windows installer
 - `Makefile` — help / install / update / uninstall / test entry points
-- `tests/test.sh` — sandboxed test suite (also run in CI together with shellcheck and a Windows smoke test)
+- `tests/test.sh` — sandboxed test suite; the `pre-commit-check` skill runs it (plus shellcheck) before every commit
 - `.zshrc` — zsh-only layer (see below)
 - `.bash_profile` — shared shell layer (see below)
 - `.vimrc` — vim-plug plugins
