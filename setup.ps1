@@ -11,7 +11,7 @@
 param(
     [ValidateSet('install', 'update', 'upgrade', 'reinstall', 'uninstall')]
     [string]$Action = 'install',
-    # Overwrite locally modified skills on update (mirrors FORCE=1 for make).
+    # Overwrite locally modified skills and CLAUDE.md on update (mirrors FORCE=1 for make).
     [switch]$Force,
     # Skip winget dependency installation (mirrors setup.sh -n).
     [switch]$SkipDeps
@@ -116,10 +116,10 @@ function Get-SkillHash([string]$Dir) {
     ([System.BitConverter]::ToString($hash) -replace '-', '').ToLower()
 }
 
-function Get-Manifest {
+function Get-Manifest([string]$Path = $ManifestPath) {
     $manifest = @{}
-    if (Test-Path $ManifestPath) {
-        Get-Content $ManifestPath | ForEach-Object {
+    if (Test-Path $Path) {
+        Get-Content $Path | ForEach-Object {
             $parts = $_ -split ' ', 2
             if ($parts.Count -eq 2) { $manifest[$parts[0]] = $parts[1] }
         }
@@ -127,9 +127,60 @@ function Get-Manifest {
     $manifest
 }
 
-function Save-Manifest($Manifest) {
+function Save-Manifest($Manifest, [string]$Path = $ManifestPath) {
+    if ($Manifest.Count -eq 0) {
+        Remove-Item $Path -Force -ErrorAction SilentlyContinue
+        return
+    }
     $Manifest.GetEnumerator() | Sort-Object Key |
-        ForEach-Object { "$($_.Key) $($_.Value)" } | Set-Content $ManifestPath
+        ForEach-Object { "$($_.Key) $($_.Value)" } | Set-Content $Path
+}
+
+# Single-file variant of the skills manifest policy, used for CLAUDE.md.
+$ClaudeManifestPath = Join-Path $ClaudeDir '.dotfiles-manifest'
+
+function Get-SingleFileHash([string]$File) {
+    (Get-FileHash $File -Algorithm SHA256).Hash.ToLower()
+}
+
+function Install-ManagedFile([string]$Source, [string]$Dest) {
+    $name = Split-Path $Dest -Leaf
+    $manifest = Get-Manifest $ClaudeManifestPath
+    $repoHash = Get-SingleFileHash $Source
+    if (-not (Test-Path $Dest)) {
+        Copy-Item $Source $Dest
+        $manifest[$name] = $repoHash
+        Save-Manifest $manifest $ClaudeManifestPath
+        Write-Host "File '$name' installed."
+        return
+    }
+    $curHash = Get-SingleFileHash $Dest
+    if ($curHash -eq $repoHash) {
+        $manifest[$name] = $repoHash
+        Write-Host "File '$name' up to date."
+    } elseif ($Force -or $curHash -eq $manifest[$name]) {
+        Copy-Item $Source $Dest -Force
+        $manifest[$name] = $repoHash
+        Write-Host "File '$name' updated."
+    } else {
+        Write-Warning "File '$name' modified locally, keeping it (use -Force to overwrite)."
+    }
+    Save-Manifest $manifest $ClaudeManifestPath
+}
+
+function Remove-ManagedFile([string]$Source, [string]$Dest) {
+    $name = Split-Path $Dest -Leaf
+    if (-not (Test-Path $Dest)) { return }
+    $manifest = Get-Manifest $ClaudeManifestPath
+    $curHash = Get-SingleFileHash $Dest
+    if ($curHash -eq $manifest[$name] -or $curHash -eq (Get-SingleFileHash $Source)) {
+        Remove-Item $Dest -Force
+        Write-Host "File '$name' removed."
+    } else {
+        Write-Warning "File '$name' modified locally, keeping it."
+    }
+    $manifest.Remove($name)
+    Save-Manifest $manifest $ClaudeManifestPath
 }
 
 function Copy-Skills {
@@ -157,6 +208,20 @@ function Copy-Skills {
             Write-Warning "Skill '$($_.Name)' modified locally, keeping it (use -Force to overwrite)."
         }
     }
+    # Prune skills that were repo-managed but no longer exist in the repo.
+    $repoNames = (Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory).Name
+    @($manifest.Keys) | Where-Object { $repoNames -notcontains $_ } | ForEach-Object {
+        $dest = Join-Path $SkillsDir $_
+        if (Test-Path $dest) {
+            if ((Get-SkillHash $dest) -eq $manifest[$_]) {
+                Remove-Item $dest -Recurse -Force
+                Write-Host "Skill '$_' no longer in repo, removed."
+            } else {
+                Write-Warning "Skill '$_' no longer in repo but modified locally, keeping it."
+            }
+        }
+        $manifest.Remove($_)
+    }
     Save-Manifest $manifest
 }
 
@@ -165,7 +230,7 @@ function Copy-Configs {
     Copy-Item (Join-Path $RepoRoot '.vimrc') (Join-Path $env:USERPROFILE '_vimrc') -Force
     New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
     Copy-Item (Join-Path $RepoRoot '.claude\settings.json') $ClaudeDir -Force
-    Copy-Item (Join-Path $RepoRoot '.claude\CLAUDE.md') $ClaudeDir -Force
+    Install-ManagedFile (Join-Path $RepoRoot '.claude\CLAUDE.md') (Join-Path $ClaudeDir 'CLAUDE.md')
     Copy-Skills
     Write-Host 'Configs updated.'
 }
@@ -174,7 +239,7 @@ function Remove-Configs {
     Write-Host 'Removing installed configs...' -ForegroundColor Yellow
     Remove-Item (Join-Path $env:USERPROFILE '_vimrc') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $ClaudeDir 'settings.json') -Force -ErrorAction SilentlyContinue
-    Remove-Item (Join-Path $ClaudeDir 'CLAUDE.md') -Force -ErrorAction SilentlyContinue
+    Remove-ManagedFile (Join-Path $RepoRoot '.claude\CLAUDE.md') (Join-Path $ClaudeDir 'CLAUDE.md')
     # Only remove repo-managed skills; keep user-authored or user-modified ones.
     $manifest = Get-Manifest
     Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory | ForEach-Object {

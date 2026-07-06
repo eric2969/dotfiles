@@ -3,7 +3,7 @@ SHELL := /bin/bash
 CONFIGS := .vimrc .p10k.zsh .tmux.conf
 # Shell rc files: only the marked block inside them is managed; local edits are kept.
 RC_CONFIGS := .zshrc .bash_profile
-# FORCE=1 overwrites locally modified skills on update.
+# FORCE=1 overwrites locally modified skills and CLAUDE.md on update.
 FORCE ?= 0
 
 .DEFAULT_GOAL := help
@@ -23,7 +23,8 @@ update: ## Copy config files into $$HOME (repeatable)
 	cp $(CONFIGS) $(HOME)/
 	@for rc in $(RC_CONFIGS); do ./rcblock.sh install "$$rc" "$(HOME)/$$rc"; done
 	mkdir -p $(HOME)/.claude
-	cp .claude/settings.json .claude/CLAUDE.md .claude/statusline-command.sh $(HOME)/.claude/
+	cp .claude/settings.json .claude/statusline-command.sh $(HOME)/.claude/
+	./skills-sync.sh install-file .claude/CLAUDE.md "$(HOME)/.claude/CLAUDE.md" "$(FORCE)"
 	./skills-sync.sh install .claude/skills "$(HOME)/.claude/skills" "$(FORCE)"
 	@echo "Configs updated."
 
@@ -37,7 +38,8 @@ reinstall: uninstall install ## Clean out installed configs, then install fresh
 uninstall: ## Remove installed configs and plugin managers (keeps ~/.claude history)
 	rm -f $(addprefix $(HOME)/,$(CONFIGS))
 	@for rc in $(RC_CONFIGS); do ./rcblock.sh remove "$(HOME)/$$rc"; done
-	rm -f $(HOME)/.claude/settings.json $(HOME)/.claude/CLAUDE.md $(HOME)/.claude/statusline-command.sh
+	rm -f $(HOME)/.claude/settings.json $(HOME)/.claude/statusline-command.sh
+	./skills-sync.sh remove-file .claude/CLAUDE.md "$(HOME)/.claude/CLAUDE.md"
 	./skills-sync.sh remove .claude/skills "$(HOME)/.claude/skills"
 	rm -rf $(HOME)/.vim/plugged $(HOME)/.vim/autoload/plug.vim
 	rm -rf $${XDG_DATA_HOME:-$(HOME)/.local/share}/zinit

@@ -15,7 +15,7 @@ make install
 |---------|--------------|
 | `make` / `make help` | List available targets |
 | `make install` | Install dependencies + tools, copy configs, install vim plugins |
-| `make update` | Copy configs into `$HOME` only (re-run any time); `FORCE=1` overwrites locally modified skills |
+| `make update` | Copy configs into `$HOME` only (re-run any time); `FORCE=1` overwrites locally modified skills and CLAUDE.md |
 | `make upgrade` | Upgrade installed OS packages, curl-installed tools (claude, uv, nvm), zinit, and vim plugins |
 | `make reinstall` | Clean out installed configs and plugin managers, then install fresh (`uninstall` + `install`) |
 | `make uninstall` | Remove installed configs and plugin managers |
@@ -25,9 +25,9 @@ make install
 
 | Files | Policy |
 |-------|--------|
-| `~/.vimrc`, `~/.p10k.zsh`, `~/.tmux.conf`, `~/.claude/settings.json`, `~/.claude/CLAUDE.md`, `~/.claude/statusline-command.sh` | Wholly repo-owned: overwritten on update, removed on uninstall — edit them in the repo |
+| `~/.vimrc`, `~/.p10k.zsh`, `~/.tmux.conf`, `~/.claude/settings.json`, `~/.claude/statusline-command.sh` | Wholly repo-owned: overwritten on update, removed on uninstall — edit them in the repo |
 | `~/.zshrc`, `~/.bash_profile` | Block-managed: only the marked block (`# >>> dotfiles managed block >>> … <<<`) is rewritten/removed; your own lines are always kept |
-| `~/.claude/skills/*` | Manifest-managed: unmodified skills auto-update, skills you edited locally are kept (use `FORCE=1` to overwrite); uninstall also keeps modified and user-authored skills |
+| `~/.claude/CLAUDE.md`, `~/.claude/skills/*` | Manifest-managed: unmodified copies auto-update, copies you edited locally are kept (use `FORCE=1` to overwrite); uninstall also keeps modified copies and user-authored skills |
 
 To skip OS package installation, run the bootstrap directly: `./setup.sh -n`.
 
@@ -38,13 +38,13 @@ git clone https://github.com/eric2969/dotfiles.git; cd dotfiles
 .\setup.ps1                          # install
 .\setup.ps1 -SkipDeps                # install without winget packages
 .\setup.ps1 -Action update           # copy configs only
-.\setup.ps1 -Action update -Force    # also overwrite locally modified skills
+.\setup.ps1 -Action update -Force    # also overwrite locally modified skills / CLAUDE.md
 .\setup.ps1 -Action upgrade          # upgrade installed packages and tools
 .\setup.ps1 -Action reinstall        # remove, then install fresh
 .\setup.ps1 -Action uninstall        # remove
 ```
 
-Skills follow the same manifest policy as on Unix: unmodified copies auto-update, locally modified copies are kept unless `-Force` is given.
+Skills and CLAUDE.md follow the same manifest policy as on Unix: unmodified copies auto-update, locally modified copies are kept unless `-Force` is given.
 
 Windows installs git/vim (winget), Chocolatey, Claude Code, uv, nvm-windows (choco), the Nerd Font, vim-plug, `_vimrc`, and Claude Code settings. zsh/tmux configs are Unix-only. Run the install from an elevated PowerShell (Chocolatey needs admin).
 
@@ -52,10 +52,10 @@ Windows installs git/vim (winget), Chocolatey, Claude Code, uv, nvm-windows (cho
 
 - `setup.sh` — Unix bootstrapper: OS packages, Sauce Code Pro Nerd Font, zinit, vim-plug, Claude Code, uv, nvm, default shell
 - `rcblock.sh` — manages the marked dotfiles block inside `~/.zshrc` / `~/.bash_profile`
-- `skills-sync.sh` — manifest-based sync of Claude Code skills into `~/.claude/skills`
+- `skills-sync.sh` — manifest-based sync of Claude Code skills into `~/.claude/skills`, plus single-file mode (`install-file` / `remove-file`) used for `~/.claude/CLAUDE.md`
 - `setup.ps1` — Windows installer
 - `Makefile` — help / install / update / upgrade / reinstall / uninstall / test entry points
-- `tests/test.sh` — sandboxed test suite; the `pre-commit-check` skill runs it (plus shellcheck) before every commit
+- `tests/test.sh` — sandboxed test suite; the `verify` skill runs it (plus shellcheck) before every commit
 - `.zshrc` — zsh-only layer (see below)
 - `.bash_profile` — shared shell layer (see below)
 - `.vimrc` — vim-plug plugins

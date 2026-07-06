@@ -1,0 +1,9 @@
+[
+  {"query": "write a python script to parse this csv and aggregate by month", "should_trigger": true},
+  {"query": "幫我在 pyproject.toml 加上 ruff 設定並修正型別註記", "should_trigger": true},
+  {"query": "refactor this Flask route to use pydantic validation", "should_trigger": true},
+  {"query": "這段 pytest fixture 怎麼寫比較好？", "should_trigger": true},
+  {"query": "write a TypeScript version of this function", "should_trigger": false},
+  {"query": "幫我寫一個 Go worker pool", "should_trigger": false},
+  {"query": "commit these changes for me", "should_trigger": false}
+]

@@ -1,0 +1,10 @@
+[
+  {"query": "help me write a Go HTTP server with graceful shutdown", "should_trigger": true},
+  {"query": "幫我改這個 goroutine leak 的問題", "should_trigger": true},
+  {"query": "add a new field to the user struct and update the repository", "should_trigger": false},
+  {"query": "review my error handling in main.go", "should_trigger": true},
+  {"query": "go.mod 要不要升級到 1.25？", "should_trigger": true},
+  {"query": "write a python script to parse this csv", "should_trigger": false},
+  {"query": "幫我寫一個 React component", "should_trigger": false},
+  {"query": "run lint on my latest changes", "should_trigger": false}
+]

@@ -1,0 +1,9 @@
+[
+  {"query": "this function is 200 lines long, help me refactor it", "should_trigger": true},
+  {"query": "幫我重構這個 module，邏輯重複太多了", "should_trigger": true},
+  {"query": "clean up this class, it's doing way too many things", "should_trigger": true},
+  {"query": "這段巢狀 if 太深了，幫我整理", "should_trigger": true},
+  {"query": "add a new feature to the billing service", "should_trigger": false},
+  {"query": "幫我修這個 bug", "should_trigger": false},
+  {"query": "run the tests to make sure nothing broke", "should_trigger": false}
+]

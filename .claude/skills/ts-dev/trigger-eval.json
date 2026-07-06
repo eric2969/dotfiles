@@ -1,0 +1,9 @@
+[
+  {"query": "write a TypeScript utility that debounces async functions", "should_trigger": true},
+  {"query": "幫我修這個 tsx component 的型別錯誤", "should_trigger": true},
+  {"query": "should this API client use generics or overloads?", "should_trigger": true},
+  {"query": "tsconfig 要不要開 strict mode？", "should_trigger": true},
+  {"query": "write a Go CLI tool for this", "should_trigger": false},
+  {"query": "幫我寫一個 Python 爬蟲", "should_trigger": false},
+  {"query": "check our dependencies for CVEs", "should_trigger": false}
+]

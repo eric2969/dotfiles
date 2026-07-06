@@ -1,0 +1,11 @@
+[
+  {"query": "i just finished refactoring the auth helper, can you run lint and type check?", "should_trigger": true},
+  {"query": "我剛改完 handler，幫我確認沒有 TypeScript 錯誤", "should_trigger": true},
+  {"query": "run the unit tests for the pricing module", "should_trigger": true},
+  {"query": "幫我 commit 這些變更", "should_trigger": true},
+  {"query": "looks good, commit and push it", "should_trigger": true},
+  {"query": "改完了，跑一下測試看有沒有壞", "should_trigger": true},
+  {"query": "any security issues in our dependencies?", "should_trigger": false},
+  {"query": "does my new component follow the project conventions?", "should_trigger": false},
+  {"query": "幫我寫一個新的 skill", "should_trigger": false}
+]

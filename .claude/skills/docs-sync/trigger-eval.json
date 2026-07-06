@@ -1,0 +1,9 @@
+[
+  {"query": "i renamed the install command, is the README still accurate?", "should_trigger": true},
+  {"query": "我加了一個新的 make target，文件要更新嗎？", "should_trigger": true},
+  {"query": "we removed the --legacy flag, update the docs", "should_trigger": true},
+  {"query": "幫我看 README 有沒有過時的內容", "should_trigger": true},
+  {"query": "write documentation comments for this function", "should_trigger": false},
+  {"query": "幫我跑測試", "should_trigger": false},
+  {"query": "review this SKILL.md format", "should_trigger": false}
+]

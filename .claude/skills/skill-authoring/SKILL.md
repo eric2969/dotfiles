@@ -85,6 +85,12 @@ inline `**Trigger:**` and `**Purpose:**` format is deprecated — move these int
    project-specific commands. Use `<lint-command>`, `<test-command>`, `<typecheck-command>`
    as placeholders so the skill works across projects.
 
+8. **Keep SKILL.md lean; details go to references/**: the SKILL.md body should stay
+   under ~100 lines with the always-apply rules only. Long material (pattern catalogs,
+   code examples, language deep dives) belongs in `references/*.md` next to the skill,
+   linked from a "References" section so it is loaded only when needed (see `go-dev`
+   for the canonical layout).
+
 ---
 
 ## Principles — Updating an existing skill
@@ -96,7 +102,7 @@ inline `**Trigger:**` and `**Purpose:**` format is deprecated — move these int
    or Pass criteria. Content within sections may change.
 
 3. **Backward compatibility check**: after updating, verify the new version does not
-   contradict sibling skills (e.g., `lint` and `style-check` must not conflict on the same topic).
+   contradict sibling skills (e.g., `verify` and `style-check` must not conflict on the same topic).
 
 4. **Project-layer update rule**: if the updated skill lives in `.claude/skills/`, the
    update must be in the same PR as the convention change that prompted it.

@@ -29,9 +29,9 @@ flagging risky upgrades.
    available remediation, but do not force major-version bumps for them.
 4. 🟡 When the user upgrades across a major version, check the package's changelog or
    release notes for breaking changes and summarize the ones that affect this codebase.
-5. 🔴 After any dependency change, run the project's install and test commands
-   (`<install-command>`, `<test-command>`) to confirm the lockfile is consistent and
-   nothing breaks.
+5. 🔴 After any dependency change, run the project's install command
+   (`<install-command>`) and then the `verify` skill (lint + type check + tests) to
+   confirm the lockfile is consistent and nothing breaks.
 
 **Pass criteria:** The audit command reports no high/critical vulnerabilities in direct
 dependencies (or each remaining one has a documented reason), and install + tests exit 0

@@ -79,6 +79,52 @@ assert "remove keeps user-modified repo skill" grep -q 'user edit again' "$SKILL
 assert "remove keeps user-authored skill" test -f "$SKILLS_DST/user-own/SKILL.md"
 assert "remove deletes manifest" test ! -f "$MANIFEST"
 
+# ---------- skills-sync.sh pruning of removed repo skills ----------
+echo "skills-sync.sh pruning"
+mkdir -p "$SKILLS_SRC/gamma" "$SKILLS_SRC/delta"
+printf 'v1\n' > "$SKILLS_SRC/gamma/SKILL.md"
+printf 'v1\n' > "$SKILLS_SRC/delta/SKILL.md"
+"$REPO/skills-sync.sh" install "$SKILLS_SRC" "$SKILLS_DST" 1
+rm -rf "$SKILLS_SRC/gamma" "$SKILLS_SRC/delta"
+printf 'local tweak\n' > "$SKILLS_DST/delta/SKILL.md"
+"$REPO/skills-sync.sh" install "$SKILLS_SRC" "$SKILLS_DST"
+assert "prune removes skill dropped from repo" test ! -d "$SKILLS_DST/gamma"
+assert "prune keeps modified skill dropped from repo" grep -q 'local tweak' "$SKILLS_DST/delta/SKILL.md"
+assert "prune drops manifest entry of kept skill" bash -c "! grep -q '^delta ' '$MANIFEST'"
+
+# ---------- skills-sync.sh single-file mode ----------
+echo "skills-sync.sh install-file / remove-file"
+FILE_SRC="$SANDBOX/repo-file.md"
+FILE_DST_DIR="$SANDBOX/file-target"
+FILE_DST="$FILE_DST_DIR/managed.md"
+FILE_MANIFEST="$FILE_DST_DIR/.dotfiles-manifest"
+printf 'v1\n' > "$FILE_SRC"
+
+"$REPO/skills-sync.sh" install-file "$FILE_SRC" "$FILE_DST"
+assert "install-file copies file" grep -q 'v1' "$FILE_DST"
+assert "install-file writes manifest" grep -q '^managed.md ' "$FILE_MANIFEST"
+
+printf 'v2\n' > "$FILE_SRC"
+"$REPO/skills-sync.sh" install-file "$FILE_SRC" "$FILE_DST"
+assert "install-file updates unmodified copy" grep -q 'v2' "$FILE_DST"
+
+printf 'user edit\n' > "$FILE_DST"
+printf 'v3\n' > "$FILE_SRC"
+"$REPO/skills-sync.sh" install-file "$FILE_SRC" "$FILE_DST"
+assert "install-file keeps user-modified copy" grep -q 'user edit' "$FILE_DST"
+
+"$REPO/skills-sync.sh" install-file "$FILE_SRC" "$FILE_DST" 1
+assert "install-file force overwrites modified copy" grep -q 'v3' "$FILE_DST"
+
+printf 'user edit again\n' > "$FILE_DST"
+"$REPO/skills-sync.sh" remove-file "$FILE_SRC" "$FILE_DST"
+assert "remove-file keeps user-modified copy" grep -q 'user edit again' "$FILE_DST"
+
+printf 'v3\n' > "$FILE_DST"
+"$REPO/skills-sync.sh" install-file "$FILE_SRC" "$FILE_DST"
+"$REPO/skills-sync.sh" remove-file "$FILE_SRC" "$FILE_DST"
+assert "remove-file deletes unmodified copy" test ! -f "$FILE_DST"
+
 # ---------- make update / uninstall end-to-end ----------
 echo "make update / uninstall"
 FAKE_HOME="$SANDBOX/home"
@@ -88,13 +134,22 @@ printf 'mine\n' > "$FAKE_HOME/.claude/skills/my-own-skill/SKILL.md"
 HOME="$FAKE_HOME" make -C "$REPO" update >/dev/null
 assert "update installs repo skills" test -f "$FAKE_HOME/.claude/skills/skill-authoring/SKILL.md"
 assert "update copies settings" test -f "$FAKE_HOME/.claude/settings.json"
+assert "update installs CLAUDE.md with manifest" grep -q '^CLAUDE.md ' "$FAKE_HOME/.claude/.dotfiles-manifest"
 assert "update writes rc block" grep -q '>>> dotfiles managed block' "$FAKE_HOME/.zshrc"
 
 OUT=$(HOME="$FAKE_HOME" make -C "$REPO" update 2>&1)
 assert "second update reports up to date" grep -q "up to date" <<<"$OUT"
 
+printf '# my local rules\n' >> "$FAKE_HOME/.claude/CLAUDE.md"
+HOME="$FAKE_HOME" make -C "$REPO" update >/dev/null 2>&1
+assert "update keeps user-modified CLAUDE.md" grep -q '# my local rules' "$FAKE_HOME/.claude/CLAUDE.md"
+
+HOME="$FAKE_HOME" make -C "$REPO" update FORCE=1 >/dev/null 2>&1
+assert "FORCE=1 overwrites modified CLAUDE.md" bash -c "! grep -q '# my local rules' '$FAKE_HOME/.claude/CLAUDE.md'"
+
 HOME="$FAKE_HOME" make -C "$REPO" uninstall >/dev/null 2>&1
 assert "uninstall removes repo skills" test ! -d "$FAKE_HOME/.claude/skills/skill-authoring"
+assert "uninstall removes CLAUDE.md" test ! -f "$FAKE_HOME/.claude/CLAUDE.md"
 assert "uninstall keeps user-authored skill" test -f "$FAKE_HOME/.claude/skills/my-own-skill/SKILL.md"
 assert "uninstall removes rc block" bash -c "! grep -q '>>> dotfiles managed block' '$FAKE_HOME/.zshrc' 2>/dev/null"
 
