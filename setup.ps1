@@ -4,10 +4,11 @@
 .DESCRIPTION
     install   - install dependencies (git, vim, choco, claude, uv, nvm), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
+    reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
 #>
 param(
-    [ValidateSet('install', 'update', 'uninstall')]
+    [ValidateSet('install', 'update', 'reinstall', 'uninstall')]
     [string]$Action = 'install',
     # Overwrite locally modified skills on update (mirrors FORCE=1 for make).
     [switch]$Force,
@@ -196,22 +197,25 @@ function Remove-Configs {
     Write-Host 'Uninstalled. (The rest of ~\.claude was kept.)'
 }
 
-switch ($Action) {
-    'install' {
-        if ($SkipDeps) {
-            Write-Warning 'Skipping dependency installation (-SkipDeps)'
-        } else {
-            Install-Dependencies
-        }
-        Install-Choco
-        Install-Claude
-        Install-Uv
-        Install-Nvm
-        Install-NerdFont
-        Install-VimPlug
-        Copy-Configs
-        Write-Host 'Install finished. Restart your terminal to apply.' -ForegroundColor Green
+function Invoke-Install {
+    if ($SkipDeps) {
+        Write-Warning 'Skipping dependency installation (-SkipDeps)'
+    } else {
+        Install-Dependencies
     }
+    Install-Choco
+    Install-Claude
+    Install-Uv
+    Install-Nvm
+    Install-NerdFont
+    Install-VimPlug
+    Copy-Configs
+    Write-Host 'Install finished. Restart your terminal to apply.' -ForegroundColor Green
+}
+
+switch ($Action) {
+    'install'   { Invoke-Install }
     'update'    { Copy-Configs }
+    'reinstall' { Remove-Configs; Invoke-Install }
     'uninstall' { Remove-Configs }
 }

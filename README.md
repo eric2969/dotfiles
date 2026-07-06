@@ -16,6 +16,7 @@ make install
 | `make` / `make help` | List available targets |
 | `make install` | Install dependencies + tools, copy configs, install vim plugins |
 | `make update` | Copy configs into `$HOME` only (re-run any time); `FORCE=1` overwrites locally modified skills |
+| `make reinstall` | Clean out installed configs and plugin managers, then install fresh (`uninstall` + `install`) |
 | `make uninstall` | Remove installed configs and plugin managers |
 | `make test` | Run the sandboxed test suite (never touches your real `$HOME`) |
 
@@ -37,6 +38,7 @@ git clone https://github.com/eric2969/dotfiles.git; cd dotfiles
 .\setup.ps1 -SkipDeps                # install without winget packages
 .\setup.ps1 -Action update           # copy configs only
 .\setup.ps1 -Action update -Force    # also overwrite locally modified skills
+.\setup.ps1 -Action reinstall        # remove, then install fresh
 .\setup.ps1 -Action uninstall        # remove
 ```
 
@@ -50,7 +52,7 @@ Windows installs git/vim (winget), Chocolatey, Claude Code, uv, nvm-windows (cho
 - `rcblock.sh` — manages the marked dotfiles block inside `~/.zshrc` / `~/.bash_profile`
 - `skills-sync.sh` — manifest-based sync of Claude Code skills into `~/.claude/skills`
 - `setup.ps1` — Windows installer
-- `Makefile` — help / install / update / uninstall / test entry points
+- `Makefile` — help / install / update / reinstall / uninstall / test entry points
 - `tests/test.sh` — sandboxed test suite; the `pre-commit-check` skill runs it (plus shellcheck) before every commit
 - `.zshrc` — zsh-only layer (see below)
 - `.bash_profile` — shared shell layer (see below)
