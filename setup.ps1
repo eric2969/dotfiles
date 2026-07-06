@@ -4,11 +4,12 @@
 .DESCRIPTION
     install   - install dependencies (git, vim, choco, claude, uv, nvm), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
+    upgrade   - upgrade installed packages and tools (winget, choco, claude, uv, vim plugins)
     reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
 #>
 param(
-    [ValidateSet('install', 'update', 'reinstall', 'uninstall')]
+    [ValidateSet('install', 'update', 'upgrade', 'reinstall', 'uninstall')]
     [string]$Action = 'install',
     # Overwrite locally modified skills on update (mirrors FORCE=1 for make).
     [switch]$Force,
@@ -197,6 +198,34 @@ function Remove-Configs {
     Write-Host 'Uninstalled. (The rest of ~\.claude was kept.)'
 }
 
+function Invoke-Upgrade {
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        Write-Host 'Upgrading winget packages...' -ForegroundColor Yellow
+        winget upgrade --id Git.Git -e --accept-source-agreements --accept-package-agreements
+        if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade Git.Git exited with code $LASTEXITCODE" }
+        winget upgrade --id vim.vim -e --accept-source-agreements --accept-package-agreements
+        if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade vim.vim exited with code $LASTEXITCODE" }
+    } else {
+        Write-Warning 'winget not found, skipping winget upgrades.'
+    }
+    if (Get-Command choco -ErrorAction SilentlyContinue) {
+        Write-Host 'Upgrading Chocolatey packages...' -ForegroundColor Yellow
+        choco upgrade nvm -y
+        if ($LASTEXITCODE -ne 0) { Write-Warning "choco upgrade nvm exited with code $LASTEXITCODE" }
+    }
+    if (Get-Command claude -ErrorAction SilentlyContinue) {
+        Write-Host 'Updating Claude Code...' -ForegroundColor Yellow
+        claude update
+    }
+    if (Get-Command uv -ErrorAction SilentlyContinue) {
+        Write-Host 'Updating uv...' -ForegroundColor Yellow
+        uv self update
+    }
+    Write-Host 'Updating vim plugins...' -ForegroundColor Yellow
+    vim +PlugUpdate +qall
+    Write-Host 'Upgrade finished. Restart your terminal to apply.' -ForegroundColor Green
+}
+
 function Invoke-Install {
     if ($SkipDeps) {
         Write-Warning 'Skipping dependency installation (-SkipDeps)'
@@ -216,6 +245,7 @@ function Invoke-Install {
 switch ($Action) {
     'install'   { Invoke-Install }
     'update'    { Copy-Configs }
+    'upgrade'   { Invoke-Upgrade }
     'reinstall' { Remove-Configs; Invoke-Install }
     'uninstall' { Remove-Configs }
 }

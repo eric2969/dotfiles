@@ -7,7 +7,7 @@ RC_CONFIGS := .zshrc .bash_profile
 FORCE ?= 0
 
 .DEFAULT_GOAL := help
-.PHONY: help install bootstrap update reinstall uninstall test
+.PHONY: help install bootstrap update upgrade reinstall uninstall test
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "} {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -26,6 +26,11 @@ update: ## Copy config files into $$HOME (repeatable)
 	cp .claude/settings.json .claude/CLAUDE.md .claude/statusline-command.sh $(HOME)/.claude/
 	./skills-sync.sh install .claude/skills "$(HOME)/.claude/skills" "$(FORCE)"
 	@echo "Configs updated."
+
+upgrade: ## Upgrade installed packages, tools, zinit, and vim plugins
+	./setup.sh upgrade
+	vim +PlugUpdate +qall
+	@echo "Upgrade finished. Restart your terminal to apply."
 
 reinstall: uninstall install ## Clean out installed configs, then install fresh
 

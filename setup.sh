@@ -145,6 +145,57 @@ install_nvm() {
     curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash
 }
 
+upgrade_deps() {
+    info "Upgrading OS packages..."
+    if command -v brew >/dev/null 2>&1; then      # macOS
+        brew update
+        brew upgrade curl git zsh vim tmux htop gcc
+    elif command -v apt-get >/dev/null 2>&1; then # Debian / Ubuntu
+        sudo apt-get update
+        sudo apt-get install --only-upgrade -y curl git zsh vim tmux htop fontconfig unzip build-essential
+    elif command -v dnf >/dev/null 2>&1; then     # Fedora
+        sudo dnf upgrade -y curl git zsh vim tmux htop util-linux-user fontconfig unzip gcc-c++
+    elif command -v pacman >/dev/null 2>&1; then  # Arch
+        # Arch discourages partial upgrades; sync the whole system instead.
+        sudo pacman -Syu --noconfirm
+    else
+        warn "Unknown OS: no brew/apt/dnf/pacman found."
+        return 1
+    fi
+}
+
+upgrade_tools() {
+    if command -v claude >/dev/null 2>&1; then
+        info "Updating Claude Code..."
+        claude update || warn "claude update failed"
+    fi
+    if command -v uv >/dev/null 2>&1; then
+        info "Updating uv..."
+        uv self update || warn "uv self update failed"
+    fi
+    # nvm has no self-update; re-run the pinned installer to sync to NVM_VERSION.
+    if [ -d "${NVM_DIR:-$HOME/.nvm}" ]; then
+        info "Syncing nvm to $NVM_VERSION..."
+        curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash \
+            || warn "nvm update failed"
+    fi
+}
+
+upgrade_zinit() {
+    local zinit_home="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
+    if [ ! -d "$zinit_home" ]; then
+        echo "zinit not installed, skipping."
+        return 0
+    fi
+    if ! command -v zsh >/dev/null 2>&1; then
+        warn "zsh not found, skipping zinit update."
+        return 0
+    fi
+    info "Updating zinit and plugins..."
+    # zinit is loaded from .zshrc, so drive it through an interactive zsh.
+    zsh -ic 'zinit self-update; zinit update --all' || warn "zinit update failed"
+}
+
 set_default_shell() {
     local zsh_path
     if ! zsh_path=$(command -v zsh); then
@@ -170,6 +221,13 @@ set_default_shell() {
 }
 
 main() {
+    if [ "${1:-}" = "upgrade" ]; then
+        upgrade_deps || warn "OS package upgrade encountered errors"
+        upgrade_tools
+        upgrade_zinit
+        ok "Upgrade finished. Run 'make update' if configs changed, then restart your terminal."
+        return 0
+    fi
     local skip_deps=false
     if [ "${1:-}" = "-n" ]; then
         skip_deps=true
