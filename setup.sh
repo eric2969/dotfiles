@@ -43,7 +43,7 @@ install_ssh_key() {
 install_deps() {
     # Fast path: skip the package manager entirely when everything is present.
     local tool missing=false
-    for tool in curl git zsh vim tmux htop; do
+    for tool in curl git zsh vim tmux btop; do
         if ! command -v "$tool" >/dev/null 2>&1; then
             missing=true
             break
@@ -56,14 +56,14 @@ install_deps() {
     info "Installing dependencies..."
     if command -v brew >/dev/null 2>&1; then      # macOS
         brew update
-        brew install curl git zsh vim tmux htop gcc
+        brew install curl git zsh vim tmux btop gcc
     elif command -v apt-get >/dev/null 2>&1; then # Debian / Ubuntu
         sudo apt-get update
-        sudo apt-get install -y curl git zsh vim tmux htop fontconfig unzip build-essential
+        sudo apt-get install -y curl git zsh vim tmux btop fontconfig unzip build-essential
     elif command -v dnf >/dev/null 2>&1; then     # Fedora
-        sudo dnf install -y curl git zsh vim tmux htop util-linux-user fontconfig unzip gcc-c++
+        sudo dnf install -y curl git zsh vim tmux btop util-linux-user fontconfig unzip gcc-c++
     elif command -v pacman >/dev/null 2>&1; then  # Arch
-        sudo pacman -S --needed --noconfirm curl git zsh vim tmux htop fontconfig unzip base-devel
+        sudo pacman -S --needed --noconfirm curl git zsh vim tmux btop fontconfig unzip base-devel
     else
         warn "Unknown OS: no brew/apt/dnf/pacman found."
         exit 1
@@ -121,7 +121,8 @@ install_claude() {
         return 0
     fi
     info "Installing Claude Code..."
-    curl -fsSL https://claude.ai/install.sh | sh
+    # Claude's installer uses bash-only syntax; pipe to bash, not sh (dash on Debian).
+    curl -fsSL https://claude.ai/install.sh | bash
 }
 
 install_uv() {
@@ -149,12 +150,12 @@ upgrade_deps() {
     info "Upgrading OS packages..."
     if command -v brew >/dev/null 2>&1; then      # macOS
         brew update
-        brew upgrade curl git zsh vim tmux htop gcc
+        brew upgrade curl git zsh vim tmux btop gcc
     elif command -v apt-get >/dev/null 2>&1; then # Debian / Ubuntu
         sudo apt-get update
-        sudo apt-get install --only-upgrade -y curl git zsh vim tmux htop fontconfig unzip build-essential
+        sudo apt-get install --only-upgrade -y curl git zsh vim tmux btop fontconfig unzip build-essential
     elif command -v dnf >/dev/null 2>&1; then     # Fedora
-        sudo dnf upgrade -y curl git zsh vim tmux htop util-linux-user fontconfig unzip gcc-c++
+        sudo dnf upgrade -y curl git zsh vim tmux btop util-linux-user fontconfig unzip gcc-c++
     elif command -v pacman >/dev/null 2>&1; then  # Arch
         # Arch discourages partial upgrades; sync the whole system instead.
         sudo pacman -Syu --noconfirm
