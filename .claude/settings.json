@@ -82,7 +82,7 @@
       "Bash(xargs:*)",
       "Bash(yq:*)",
       "WebFetch",
-      "Write(/tmp)",
+      "Edit(/tmp)",
       "Skill(superpowers:brainstorming)",
       "Skill(superpowers:requesting-code-review)",
       "Skill(superpowers:writing-plans)"
