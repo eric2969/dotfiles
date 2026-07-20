@@ -25,7 +25,7 @@ make install
 
 | Files | Policy |
 |-------|--------|
-| `~/.vimrc`, `~/.p10k.zsh`, `~/.tmux.conf`, `~/.claude/settings.json`, `~/.claude/statusline-command.sh` | Wholly repo-owned: overwritten on update, removed on uninstall — edit them in the repo |
+| `~/.vimrc`, `~/.p10k.zsh`, `~/.tmux.conf`, `~/.claude/settings.json`, `~/.claude/statusline-command.sh`, `~/.codex/config.toml` | Wholly repo-owned: overwritten on update, removed on uninstall — edit them in the repo |
 | `~/.zshrc`, `~/.bash_profile` | Block-managed: only the marked block (`# >>> dotfiles managed block >>> … <<<`) is rewritten/removed; your own lines are always kept |
 | `~/.claude/CLAUDE.md`, `~/.agents/skills/*` | Manifest-managed: unmodified copies auto-update, copies you edited locally are kept (use `FORCE=1` to overwrite) |
 | `~/.claude/skills/*`, `~/.codex/skills/*` | Symlinks to the shared copies in `~/.agents/skills`; unrelated and system skills are kept |
@@ -64,6 +64,7 @@ Windows installs git/vim/Node.js LTS (winget), Chocolatey, Claude Code, Codex CL
 - `.tmux.conf` — tmux config
 - `.agents/skills/` — shared skills used by Claude Code and Codex
 - `.claude/` — Claude Code-specific settings and CLAUDE.md
+- `.codex/config.toml` — Codex CLI settings, including the TUI status line
 
 ## Shell config layout
 

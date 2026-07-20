@@ -24,6 +24,8 @@ update: ## Copy config files into $$HOME (repeatable)
 	@for rc in $(RC_CONFIGS); do ./rcblock.sh install "$$rc" "$(HOME)/$$rc"; done
 	mkdir -p $(HOME)/.claude
 	cp .claude/settings.json .claude/statusline-command.sh $(HOME)/.claude/
+	mkdir -p $(HOME)/.codex
+	cp .codex/config.toml $(HOME)/.codex/
 	./skills-sync.sh install-file .claude/CLAUDE.md "$(HOME)/.claude/CLAUDE.md" "$(FORCE)"
 	./skills-sync.sh install .agents/skills "$(HOME)/.agents/skills" "$(FORCE)"
 	@if [ -f "$(HOME)/.claude/skills/.dotfiles-manifest" ]; then ./skills-sync.sh remove .agents/skills "$(HOME)/.claude/skills"; fi
@@ -42,6 +44,7 @@ uninstall: ## Remove installed configs and plugin managers (keeps ~/.claude hist
 	rm -f $(addprefix $(HOME)/,$(CONFIGS))
 	@for rc in $(RC_CONFIGS); do ./rcblock.sh remove "$(HOME)/$$rc"; done
 	rm -f $(HOME)/.claude/settings.json $(HOME)/.claude/statusline-command.sh
+	rm -f $(HOME)/.codex/config.toml
 	./skills-sync.sh remove-file .claude/CLAUDE.md "$(HOME)/.claude/CLAUDE.md"
 	./skill-links.sh remove "$(HOME)/.agents/skills" "$(HOME)/.claude/skills"
 	./skill-links.sh remove "$(HOME)/.agents/skills" "$(HOME)/.codex/skills"

@@ -335,6 +335,8 @@ function Copy-Configs {
     Copy-Item (Join-Path $RepoRoot '.vimrc') (Join-Path $env:USERPROFILE '_vimrc') -Force
     New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
     Copy-Item (Join-Path $RepoRoot '.claude\settings.json') $ClaudeDir -Force
+    New-Item -ItemType Directory -Force -Path $CodexDir | Out-Null
+    Copy-Item (Join-Path $RepoRoot '.codex\config.toml') $CodexDir -Force
     Install-ManagedFile (Join-Path $RepoRoot '.claude\CLAUDE.md') (Join-Path $ClaudeDir 'CLAUDE.md')
     Copy-Skills
     Remove-LegacyClaudeSkillCopies
@@ -347,6 +349,7 @@ function Remove-Configs {
     Write-Host 'Removing installed configs...' -ForegroundColor Yellow
     Remove-Item (Join-Path $env:USERPROFILE '_vimrc') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $ClaudeDir 'settings.json') -Force -ErrorAction SilentlyContinue
+    Remove-Item (Join-Path $CodexDir 'config.toml') -Force -ErrorAction SilentlyContinue
     Remove-ManagedFile (Join-Path $RepoRoot '.claude\CLAUDE.md') (Join-Path $ClaudeDir 'CLAUDE.md')
     # Only remove repo-managed skills; keep user-authored or user-modified ones.
     $manifest = Get-Manifest
