@@ -146,6 +146,26 @@ install_nvm() {
     curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash
 }
 
+install_codex() {
+    if command -v codex >/dev/null 2>&1; then
+        echo "Codex CLI already installed."
+        return 0
+    fi
+    if ! command -v npm >/dev/null 2>&1; then
+        local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+        if [ ! -s "$nvm_sh" ]; then
+            warn "npm not found, cannot install Codex CLI."
+            return 1
+        fi
+        info "Installing Node.js LTS for Codex CLI..."
+        # shellcheck source=/dev/null
+        source "$nvm_sh"
+        nvm install --lts
+    fi
+    info "Installing Codex CLI..."
+    npm install -g @openai/codex
+}
+
 upgrade_deps() {
     info "Upgrading OS packages..."
     if command -v brew >/dev/null 2>&1; then      # macOS
@@ -173,6 +193,10 @@ upgrade_tools() {
     if command -v uv >/dev/null 2>&1; then
         info "Updating uv..."
         uv self update || warn "uv self update failed"
+    fi
+    if command -v npm >/dev/null 2>&1; then
+        info "Updating Codex CLI..."
+        npm install -g @openai/codex || warn "Codex CLI update failed"
     fi
     # nvm has no self-update; re-run the pinned installer to sync to NVM_VERSION.
     if [ -d "${NVM_DIR:-$HOME/.nvm}" ]; then
@@ -245,6 +269,7 @@ main() {
     install_claude
     install_uv
     install_nvm
+    install_codex
     set_default_shell
     ok "Bootstrap finished. Run 'make update' to copy configs, then restart your terminal."
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sandboxed test suite for rcblock.sh, skills-sync.sh, and the make targets.
+# Sandboxed test suite for rcblock.sh, skill syncing/linking, and make targets.
 # Everything runs against a throwaway HOME; the real home is never touched.
 set -euo pipefail
 
@@ -130,9 +130,14 @@ echo "make update / uninstall"
 FAKE_HOME="$SANDBOX/home"
 mkdir -p "$FAKE_HOME/.claude/skills/my-own-skill"
 printf 'mine\n' > "$FAKE_HOME/.claude/skills/my-own-skill/SKILL.md"
+# Simulate an install made before shared skills moved from ~/.claude to ~/.agents.
+"$REPO/skills-sync.sh" install "$REPO/.agents/skills" "$FAKE_HOME/.claude/skills" >/dev/null
 
 HOME="$FAKE_HOME" make -C "$REPO" update >/dev/null
-assert "update installs repo skills" test -f "$FAKE_HOME/.claude/skills/skill-authoring/SKILL.md"
+assert "update installs shared repo skills" test -f "$FAKE_HOME/.agents/skills/skill-authoring/SKILL.md"
+assert "update links skills into Claude" test -L "$FAKE_HOME/.claude/skills/skill-authoring"
+assert "update links skills into Codex" test -L "$FAKE_HOME/.codex/skills/skill-authoring"
+assert "update migrates legacy Claude skill copies" test ! -f "$FAKE_HOME/.claude/skills/.dotfiles-manifest"
 assert "update copies settings" test -f "$FAKE_HOME/.claude/settings.json"
 assert "update installs CLAUDE.md with manifest" grep -q '^CLAUDE.md ' "$FAKE_HOME/.claude/.dotfiles-manifest"
 assert "update writes rc block" grep -q '>>> dotfiles managed block' "$FAKE_HOME/.zshrc"
@@ -148,7 +153,8 @@ HOME="$FAKE_HOME" make -C "$REPO" update FORCE=1 >/dev/null 2>&1
 assert "FORCE=1 overwrites modified CLAUDE.md" bash -c "! grep -q '# my local rules' '$FAKE_HOME/.claude/CLAUDE.md'"
 
 HOME="$FAKE_HOME" make -C "$REPO" uninstall >/dev/null 2>&1
-assert "uninstall removes repo skills" test ! -d "$FAKE_HOME/.claude/skills/skill-authoring"
+assert "uninstall removes shared repo skills" test ! -d "$FAKE_HOME/.agents/skills/skill-authoring"
+assert "uninstall removes Codex skill links" test ! -L "$FAKE_HOME/.codex/skills/skill-authoring"
 assert "uninstall removes CLAUDE.md" test ! -f "$FAKE_HOME/.claude/CLAUDE.md"
 assert "uninstall keeps user-authored skill" test -f "$FAKE_HOME/.claude/skills/my-own-skill/SKILL.md"
 assert "uninstall removes rc block" bash -c "! grep -q '>>> dotfiles managed block' '$FAKE_HOME/.zshrc' 2>/dev/null"

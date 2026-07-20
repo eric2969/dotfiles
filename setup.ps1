@@ -2,9 +2,9 @@
 .SYNOPSIS
     Windows installer for these dotfiles.
 .DESCRIPTION
-    install   - install dependencies (git, vim, choco, claude, uv, nvm), Nerd Font, vim-plug, then copy configs
+    install   - install dependencies (git, vim, node, choco, claude, codex, uv, nvm), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
-    upgrade   - upgrade installed packages and tools (winget, choco, claude, uv, vim plugins)
+    upgrade   - upgrade installed packages and tools (winget, choco, claude, codex, uv, vim plugins)
     reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
 #>
@@ -20,6 +20,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $RepoRoot = $PSScriptRoot
 $ClaudeDir = Join-Path $env:USERPROFILE '.claude'
+$AgentsDir = Join-Path $env:USERPROFILE '.agents'
+$CodexDir = Join-Path $env:USERPROFILE '.codex'
 
 function Install-Dependencies {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
@@ -30,6 +32,9 @@ function Install-Dependencies {
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install Git.Git exited with code $LASTEXITCODE" }
     winget install --id vim.vim -e --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install vim.vim exited with code $LASTEXITCODE" }
+    winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) { Write-Warning "winget install OpenJS.NodeJS.LTS exited with code $LASTEXITCODE" }
+    $env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH', 'User')
 }
 
 function Install-Choco {
@@ -69,6 +74,26 @@ function Install-Nvm {
     if ($LASTEXITCODE -ne 0) { Write-Warning "choco install nvm exited with code $LASTEXITCODE" }
 }
 
+function Install-Codex {
+    if (Get-Command codex -ErrorAction SilentlyContinue) {
+        Write-Host 'Codex CLI already installed.'
+        return
+    }
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        throw 'npm not found. Install Node.js LTS before installing Codex CLI.'
+    }
+    Write-Host 'Installing Codex CLI...' -ForegroundColor Yellow
+    npm install -g '@openai/codex'
+    if ($LASTEXITCODE -ne 0) { throw "npm install @openai/codex exited with code $LASTEXITCODE" }
+}
+
+function Enable-SymbolicLinks {
+    $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+    Write-Host 'Enabling Windows Developer Mode for symbolic links...' -ForegroundColor Yellow
+    New-Item -Path $key -Force | Out-Null
+    New-ItemProperty -Path $key -Name AllowDevelopmentWithoutDevLicense -PropertyType DWord -Value 1 -Force | Out-Null
+}
+
 function Install-NerdFont {
     $userFonts   = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Fonts" -Filter 'SauceCodePro*.ttf' -ErrorAction SilentlyContinue
     $systemFonts = Get-ChildItem "$env:windir\Fonts" -Filter 'SauceCodePro*.ttf' -ErrorAction SilentlyContinue
@@ -102,7 +127,7 @@ function Install-VimPlug {
 
 # A content-hash manifest tells apart "user modified the installed copy" (kept)
 # from "installed copy is just an older repo version" (updated).
-$SkillsDir = Join-Path $ClaudeDir 'skills'
+$SkillsDir = Join-Path $AgentsDir 'skills'
 $ManifestPath = Join-Path $SkillsDir '.dotfiles-manifest'
 
 function Get-SkillHash([string]$Dir) {
@@ -186,7 +211,7 @@ function Remove-ManagedFile([string]$Source, [string]$Dest) {
 function Copy-Skills {
     New-Item -ItemType Directory -Force -Path $SkillsDir | Out-Null
     $manifest = Get-Manifest
-    Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory | ForEach-Object {
+    Get-ChildItem (Join-Path $RepoRoot '.agents\skills') -Directory | ForEach-Object {
         $dest = Join-Path $SkillsDir $_.Name
         $repoHash = Get-SkillHash $_.FullName
         if (-not (Test-Path $dest)) {
@@ -209,7 +234,7 @@ function Copy-Skills {
         }
     }
     # Prune skills that were repo-managed but no longer exist in the repo.
-    $repoNames = (Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory).Name
+    $repoNames = (Get-ChildItem (Join-Path $RepoRoot '.agents\skills') -Directory).Name
     @($manifest.Keys) | Where-Object { $repoNames -notcontains $_ } | ForEach-Object {
         $dest = Join-Path $SkillsDir $_
         if (Test-Path $dest) {
@@ -225,13 +250,96 @@ function Copy-Skills {
     Save-Manifest $manifest
 }
 
+function Sync-SkillLinks([string]$TargetRoot) {
+    New-Item -ItemType Directory -Force -Path $TargetRoot | Out-Null
+    $linkManifest = Join-Path $TargetRoot '.dotfiles-links'
+    $managed = @()
+    if (Test-Path $linkManifest) { $managed = @(Get-Content $linkManifest) }
+
+    Get-ChildItem (Join-Path $RepoRoot '.agents\skills') -Directory | ForEach-Object {
+        $name = $_.Name
+        $source = Join-Path $SkillsDir $name
+        $dest = Join-Path $TargetRoot $name
+        if (Test-Path $dest) {
+            $item = Get-Item $dest -Force
+            $target = @($item.Target)[0]
+            if ($item.LinkType -eq 'SymbolicLink' -and $target -eq $source) {
+                Write-Host "Skill link '$name' up to date."
+            } elseif ($item.LinkType -eq 'SymbolicLink' -and $Force) {
+                Remove-Item $dest -Force
+                New-Item -ItemType SymbolicLink -Path $dest -Target $source | Out-Null
+                Write-Host "Skill link '$name' updated."
+            } else {
+                Write-Warning "Skill '$name' already exists in $TargetRoot, keeping it."
+                return
+            }
+        } else {
+            New-Item -ItemType SymbolicLink -Path $dest -Target $source | Out-Null
+            Write-Host "Skill link '$name' installed."
+        }
+        if ($managed -notcontains $name) { $managed += $name }
+    }
+    $repoNames = @(Get-ChildItem (Join-Path $RepoRoot '.agents\skills') -Directory).Name
+    @($managed) | Where-Object { $repoNames -notcontains $_ } | ForEach-Object {
+        $dest = Join-Path $TargetRoot $_
+        if ((Test-Path $dest) -and (Get-Item $dest -Force).LinkType -eq 'SymbolicLink') {
+            Remove-Item $dest -Force
+            Write-Host "Skill link '$_' no longer managed, removed."
+        }
+        $removedName = $_
+        $managed = @($managed | Where-Object { $_ -ne $removedName })
+    }
+    if ($managed.Count) { $managed | Sort-Object -Unique | Set-Content $linkManifest }
+    else { Remove-Item $linkManifest -Force -ErrorAction SilentlyContinue }
+}
+
+function Remove-LegacyClaudeSkillCopies {
+    $legacyRoot = Join-Path $ClaudeDir 'skills'
+    $legacyManifest = Join-Path $legacyRoot '.dotfiles-manifest'
+    if (-not (Test-Path $legacyManifest)) { return }
+    $manifest = Get-Manifest $legacyManifest
+    Get-ChildItem (Join-Path $RepoRoot '.agents\skills') -Directory | ForEach-Object {
+        $dest = Join-Path $legacyRoot $_.Name
+        if (-not (Test-Path $dest)) { return }
+        $curHash = Get-SkillHash $dest
+        if ($curHash -eq $manifest[$_.Name] -or $curHash -eq (Get-SkillHash $_.FullName)) {
+            Remove-Item $dest -Recurse -Force
+            Write-Host "Legacy Claude skill '$($_.Name)' migrated to shared skills."
+        } else {
+            Write-Warning "Legacy Claude skill '$($_.Name)' was modified locally, keeping it."
+        }
+    }
+    Remove-Item $legacyManifest -Force
+}
+
+function Remove-SkillLinks([string]$TargetRoot) {
+    $linkManifest = Join-Path $TargetRoot '.dotfiles-links'
+    if (-not (Test-Path $linkManifest)) { return }
+    Get-Content $linkManifest | ForEach-Object {
+        $dest = Join-Path $TargetRoot $_
+        if (Test-Path $dest) {
+            $item = Get-Item $dest -Force
+            if ($item.LinkType -eq 'SymbolicLink' -and @($item.Target)[0] -eq (Join-Path $SkillsDir $_)) {
+                Remove-Item $dest -Force
+                Write-Host "Skill link '$_' removed."
+            }
+        }
+    }
+    Remove-Item $linkManifest -Force
+    if ((Test-Path $TargetRoot) -and -not (Get-ChildItem $TargetRoot -Force)) { Remove-Item $TargetRoot -Force }
+}
+
 function Copy-Configs {
     Write-Host 'Copying configs...' -ForegroundColor Yellow
+    Enable-SymbolicLinks
     Copy-Item (Join-Path $RepoRoot '.vimrc') (Join-Path $env:USERPROFILE '_vimrc') -Force
     New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
     Copy-Item (Join-Path $RepoRoot '.claude\settings.json') $ClaudeDir -Force
     Install-ManagedFile (Join-Path $RepoRoot '.claude\CLAUDE.md') (Join-Path $ClaudeDir 'CLAUDE.md')
     Copy-Skills
+    Remove-LegacyClaudeSkillCopies
+    Sync-SkillLinks (Join-Path $ClaudeDir 'skills')
+    Sync-SkillLinks (Join-Path $CodexDir 'skills')
     Write-Host 'Configs updated.'
 }
 
@@ -242,7 +350,9 @@ function Remove-Configs {
     Remove-ManagedFile (Join-Path $RepoRoot '.claude\CLAUDE.md') (Join-Path $ClaudeDir 'CLAUDE.md')
     # Only remove repo-managed skills; keep user-authored or user-modified ones.
     $manifest = Get-Manifest
-    Get-ChildItem (Join-Path $RepoRoot '.claude\skills') -Directory | ForEach-Object {
+    Remove-SkillLinks (Join-Path $ClaudeDir 'skills')
+    Remove-SkillLinks (Join-Path $CodexDir 'skills')
+    Get-ChildItem (Join-Path $RepoRoot '.agents\skills') -Directory | ForEach-Object {
         $dest = Join-Path $SkillsDir $_.Name
         if (-not (Test-Path $dest)) { return }
         $curHash = Get-SkillHash $dest
@@ -270,6 +380,8 @@ function Invoke-Upgrade {
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade Git.Git exited with code $LASTEXITCODE" }
         winget upgrade --id vim.vim -e --accept-source-agreements --accept-package-agreements
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade vim.vim exited with code $LASTEXITCODE" }
+        winget upgrade --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
+        if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade OpenJS.NodeJS.LTS exited with code $LASTEXITCODE" }
     } else {
         Write-Warning 'winget not found, skipping winget upgrades.'
     }
@@ -286,6 +398,11 @@ function Invoke-Upgrade {
         Write-Host 'Updating uv...' -ForegroundColor Yellow
         uv self update
     }
+    if (Get-Command npm -ErrorAction SilentlyContinue) {
+        Write-Host 'Updating Codex CLI...' -ForegroundColor Yellow
+        npm install -g '@openai/codex'
+        if ($LASTEXITCODE -ne 0) { Write-Warning "Codex CLI update exited with code $LASTEXITCODE" }
+    }
     Write-Host 'Updating vim plugins...' -ForegroundColor Yellow
     vim +PlugUpdate +qall
     Write-Host 'Upgrade finished. Restart your terminal to apply.' -ForegroundColor Green
@@ -301,6 +418,7 @@ function Invoke-Install {
     Install-Claude
     Install-Uv
     Install-Nvm
+    Install-Codex
     Install-NerdFont
     Install-VimPlug
     Copy-Configs

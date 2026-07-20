@@ -1,8 +1,8 @@
 # Dotfiles
 
-Personal environment setup: zsh (zinit + powerlevel10k), vim (vim-plug), tmux, and Claude Code settings.
+Personal environment setup: zsh (zinit + powerlevel10k), vim (vim-plug), tmux, Claude Code, and Codex CLI.
 
-Configs are **copied** into `$HOME` (not symlinked), so this repo can be deleted after installation.
+Configs and shared skills are copied into `$HOME`, so this repo can be deleted after installation. Only the agent-facing skill entries are symlinks, and they point to `~/.agents/skills` rather than back to this repo.
 
 ## Install (macOS / Linux)
 
@@ -27,7 +27,8 @@ make install
 |-------|--------|
 | `~/.vimrc`, `~/.p10k.zsh`, `~/.tmux.conf`, `~/.claude/settings.json`, `~/.claude/statusline-command.sh` | Wholly repo-owned: overwritten on update, removed on uninstall — edit them in the repo |
 | `~/.zshrc`, `~/.bash_profile` | Block-managed: only the marked block (`# >>> dotfiles managed block >>> … <<<`) is rewritten/removed; your own lines are always kept |
-| `~/.claude/CLAUDE.md`, `~/.claude/skills/*` | Manifest-managed: unmodified copies auto-update, copies you edited locally are kept (use `FORCE=1` to overwrite); uninstall also keeps modified copies and user-authored skills |
+| `~/.claude/CLAUDE.md`, `~/.agents/skills/*` | Manifest-managed: unmodified copies auto-update, copies you edited locally are kept (use `FORCE=1` to overwrite) |
+| `~/.claude/skills/*`, `~/.codex/skills/*` | Symlinks to the shared copies in `~/.agents/skills`; unrelated and system skills are kept |
 
 To skip OS package installation, run the bootstrap directly: `./setup.sh -n`.
 
@@ -44,15 +45,16 @@ git clone https://github.com/eric2969/dotfiles.git; cd dotfiles
 .\setup.ps1 -Action uninstall        # remove
 ```
 
-Skills and CLAUDE.md follow the same manifest policy as on Unix: unmodified copies auto-update, locally modified copies are kept unless `-Force` is given.
+Shared skills live in `~/.agents/skills` and follow the same manifest policy as on Unix. Both `~/.claude/skills` and `~/.codex/skills` link to those shared copies; locally modified or unrelated skills are preserved. The installer enables Windows Developer Mode so non-elevated processes can create symbolic links (run setup from an elevated PowerShell for the registry change).
 
-Windows installs git/vim (winget), Chocolatey, Claude Code, uv, nvm-windows (choco), the Nerd Font, vim-plug, `_vimrc`, and Claude Code settings. zsh/tmux configs are Unix-only. Run the install from an elevated PowerShell (Chocolatey needs admin).
+Windows installs git/vim/Node.js LTS (winget), Chocolatey, Claude Code, Codex CLI, uv, nvm-windows (choco), the Nerd Font, vim-plug, `_vimrc`, and agent settings. zsh/tmux configs are Unix-only. Run the install from an elevated PowerShell (Chocolatey and Developer Mode setup need admin).
 
 ## What's inside
 
 - `setup.sh` — Unix bootstrapper: OS packages, Sauce Code Pro Nerd Font, zinit, vim-plug, Claude Code, uv, nvm, default shell
 - `rcblock.sh` — manages the marked dotfiles block inside `~/.zshrc` / `~/.bash_profile`
-- `skills-sync.sh` — manifest-based sync of Claude Code skills into `~/.claude/skills`, plus single-file mode (`install-file` / `remove-file`) used for `~/.claude/CLAUDE.md`
+- `skills-sync.sh` — manifest-based sync of shared skills into `~/.agents/skills`, plus single-file mode (`install-file` / `remove-file`) used for `~/.claude/CLAUDE.md`
+- `skill-links.sh` — links shared skills into both `~/.claude/skills` and `~/.codex/skills`
 - `setup.ps1` — Windows installer
 - `Makefile` — help / install / update / upgrade / reinstall / uninstall / test entry points
 - `tests/test.sh` — sandboxed test suite; the `verify` skill runs it (plus shellcheck) before every commit
@@ -60,7 +62,8 @@ Windows installs git/vim (winget), Chocolatey, Claude Code, uv, nvm-windows (cho
 - `.bash_profile` — shared shell layer (see below)
 - `.vimrc` — vim-plug plugins
 - `.tmux.conf` — tmux config
-- `.claude/` — Claude Code settings, CLAUDE.md, skills
+- `.agents/skills/` — shared skills used by Claude Code and Codex
+- `.claude/` — Claude Code-specific settings and CLAUDE.md
 
 ## Shell config layout
 
