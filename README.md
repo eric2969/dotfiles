@@ -26,7 +26,7 @@ make install
 | Files | Policy |
 |-------|--------|
 | `~/.vimrc`, `~/.p10k.zsh`, `~/.tmux.conf`, `~/.claude/settings.json`, `~/.claude/statusline-command.sh`, `~/.codex/config.toml` | Wholly repo-owned: overwritten on update, removed on uninstall — edit them in the repo |
-| `~/.zshrc`, `~/.bash_profile` | Block-managed: only the marked block (`# >>> dotfiles managed block >>> … <<<`) is rewritten/removed; your own lines are always kept |
+| `~/.zshrc`, `~/.bash_profile`, `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Block-managed: only the marked block (`# >>> dotfiles managed block >>> … <<<`) is rewritten/removed; your own lines are always kept |
 | `~/.claude/CLAUDE.md`, `~/.agents/skills/*` | Manifest-managed: unmodified copies auto-update, copies you edited locally are kept (use `FORCE=1` to overwrite) |
 | `~/.claude/skills/*`, `~/.codex/skills/*` | Symlinks to the shared copies in `~/.agents/skills`; unrelated and system skills are kept |
 
@@ -47,7 +47,9 @@ git clone https://github.com/eric2969/dotfiles.git; cd dotfiles
 
 Shared skills live in `~/.agents/skills` and follow the same manifest policy as on Unix. Both `~/.claude/skills` and `~/.codex/skills` link to those shared copies; locally modified or unrelated skills are preserved. The installer enables Windows Developer Mode so non-elevated processes can create symbolic links (run setup from an elevated PowerShell for the registry change).
 
-Windows installs git/vim/Node.js LTS (winget), Chocolatey, Claude Code, Codex CLI, uv, nvm-windows (choco), the Nerd Font, vim-plug, `_vimrc`, and agent settings. zsh/tmux configs are Unix-only. Run the install from an elevated PowerShell (Chocolatey and Developer Mode setup need admin).
+Windows installs git/vim/Node.js LTS/oh-my-posh (winget), Chocolatey, Claude Code, Codex CLI, uv, nvm-windows (choco), the posh-git and PSReadLine modules, the Nerd Font, vim-plug, `_vimrc`, the PowerShell 7 profile, and agent settings. zsh/tmux configs are Unix-only. Run the install from an elevated PowerShell (Chocolatey and Developer Mode setup need admin).
+
+The PowerShell profile is installed into `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (resolved through the real Documents folder, so OneDrive redirection works) as a managed block, the same policy `.zshrc` gets on Unix — anything you add outside the markers survives updates and uninstall.
 
 ## What's inside
 
@@ -55,7 +57,8 @@ Windows installs git/vim/Node.js LTS (winget), Chocolatey, Claude Code, Codex CL
 - `rcblock.sh` — manages the marked dotfiles block inside `~/.zshrc` / `~/.bash_profile`
 - `skills-sync.sh` — manifest-based sync of shared skills into `~/.agents/skills`, plus single-file mode (`install-file` / `remove-file`) used for `~/.claude/CLAUDE.md`
 - `skill-links.sh` — links shared skills into both `~/.claude/skills` and `~/.codex/skills`
-- `setup.ps1` — Windows installer
+- `setup.ps1` — Windows installer; also manages the marked block inside the PowerShell profile
+- `Microsoft.PowerShell_profile.ps1` — PowerShell 7 profile: prompt (posh-git + oh-my-posh), PSReadLine history/prediction, and the same aliases as `.bash_profile`
 - `Makefile` — help / install / update / upgrade / reinstall / uninstall / test entry points
 - `tests/test.sh` — sandboxed test suite; the `verify` skill runs it (plus shellcheck) before every commit
 - `.zshrc` — zsh-only layer (see below)
@@ -75,6 +78,7 @@ The shell config is split into two layers; they cannot be merged into one file b
 |------|---------|----------|
 | `.bash_profile` | bash directly; zsh via `source` at the end of `.zshrc` | **Shared layer**, POSIX syntax only: common env vars (`TERM`, `EDITOR`, `LC_ALL`, …), `~/.local/bin` on PATH (claude, uv), nvm init, all aliases |
 | `.zshrc` | zsh only | **zsh layer**: p10k instant prompt, zinit plugins, `compinit`, `setopt` history options, `HISTFILE` (`~/.zsh_history`), p10k theme |
+| `Microsoft.PowerShell_profile.ps1` | PowerShell 7 only (Windows) | **PowerShell layer**: mirrors the `.bash_profile` env vars and aliases in PowerShell syntax, plus PSReadLine options and the posh-git / oh-my-posh prompt |
 
 Rule of thumb: anything both shells should see goes in `.bash_profile`; anything using
 zsh syntax or configuring zsh itself goes in `.zshrc`.

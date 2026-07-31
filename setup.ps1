@@ -22,6 +22,10 @@ $RepoRoot = $PSScriptRoot
 $ClaudeDir = Join-Path $env:USERPROFILE '.claude'
 $AgentsDir = Join-Path $env:USERPROFILE '.agents'
 $CodexDir = Join-Path $env:USERPROFILE '.codex'
+# PowerShell 7 profile, resolved via MyDocuments so OneDrive-redirected
+# Documents folders are handled. Always the pwsh path, even when setup.ps1
+# itself runs under Windows PowerShell 5.1.
+$PwshProfile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Microsoft.PowerShell_profile.ps1'
 
 function Install-Dependencies {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
@@ -34,7 +38,26 @@ function Install-Dependencies {
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install vim.vim exited with code $LASTEXITCODE" }
     winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install OpenJS.NodeJS.LTS exited with code $LASTEXITCODE" }
+    winget install --id JanDeDobbeleer.OhMyPosh -e --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) { Write-Warning "winget install JanDeDobbeleer.OhMyPosh exited with code $LASTEXITCODE" }
     $env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH', 'User')
+}
+
+# Modules the profile prompt and line editor rely on; both degrade gracefully
+# when missing, so a failed install is a warning rather than a hard error.
+function Install-PsModules {
+    foreach ($module in 'posh-git', 'PSReadLine') {
+        if (Get-Module $module -ListAvailable) {
+            Write-Host "PowerShell module '$module' already installed."
+            continue
+        }
+        Write-Host "Installing PowerShell module '$module'..." -ForegroundColor Yellow
+        try {
+            Install-Module $module -Scope CurrentUser -Force -AllowClobber -ErrorAction Stop
+        } catch {
+            Write-Warning "Install-Module $module failed: $_"
+        }
+    }
 }
 
 function Install-Choco {
@@ -329,10 +352,59 @@ function Remove-SkillLinks([string]$TargetRoot) {
     if ((Test-Path $TargetRoot) -and -not (Get-ChildItem $TargetRoot -Force)) { Remove-Item $TargetRoot -Force }
 }
 
+# Managed-block policy for the PowerShell profile, mirroring rcblock.sh on Unix:
+# only the marked region belongs to the repo, anything the user adds is kept.
+$BlockBegin = '# >>> dotfiles managed block - do not edit, "setup.ps1 -Action update" rewrites it >>>'
+$BlockEnd = '# <<< dotfiles managed block <<<'
+
+function Install-RcBlock([string]$Source, [string]$Dest) {
+    $block = @($BlockBegin) + (Get-Content $Source) + @($BlockEnd)
+    New-Item -ItemType Directory -Force -Path (Split-Path $Dest) | Out-Null
+
+    if (-not (Test-Path $Dest)) {
+        Set-Content $Dest $block
+        Write-Host "Profile '$(Split-Path $Dest -Leaf)' installed."
+        return
+    }
+
+    $lines = @(Get-Content $Dest)
+    $begin = [array]::IndexOf($lines, $BlockBegin)
+    if ($begin -ge 0) {
+        $end = [array]::IndexOf($lines, $BlockEnd, $begin)
+        if ($end -lt 0) { throw "Unterminated dotfiles block in $Dest" }
+        # Replace in place so the block keeps its position in the file.
+        $head = if ($begin -gt 0) { $lines[0..($begin - 1)] } else { @() }
+        $lines = @($head) + $block + @($lines | Select-Object -Skip ($end + 1))
+    } else {
+        $lines = $lines + @('') + $block
+    }
+    Set-Content $Dest $lines
+    Write-Host "Profile '$(Split-Path $Dest -Leaf)' updated."
+}
+
+function Remove-RcBlock([string]$Dest) {
+    if (-not (Test-Path $Dest)) { return }
+    $lines = @(Get-Content $Dest)
+    $begin = [array]::IndexOf($lines, $BlockBegin)
+    if ($begin -lt 0) { return }
+    $end = [array]::IndexOf($lines, $BlockEnd, $begin)
+    if ($end -lt 0) { throw "Unterminated dotfiles block in $Dest" }
+    $head = if ($begin -gt 0) { $lines[0..($begin - 1)] } else { @() }
+    $kept = @($head) + @($lines | Select-Object -Skip ($end + 1))
+    if ($kept -match '\S') {
+        Set-Content $Dest $kept
+        Write-Host "Profile block removed from '$(Split-Path $Dest -Leaf)'."
+    } else {
+        Remove-Item $Dest -Force
+        Write-Host "Profile '$(Split-Path $Dest -Leaf)' removed."
+    }
+}
+
 function Copy-Configs {
     Write-Host 'Copying configs...' -ForegroundColor Yellow
     Enable-SymbolicLinks
     Copy-Item (Join-Path $RepoRoot '.vimrc') (Join-Path $env:USERPROFILE '_vimrc') -Force
+    Install-RcBlock (Join-Path $RepoRoot 'Microsoft.PowerShell_profile.ps1') $PwshProfile
     New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
     Copy-Item (Join-Path $RepoRoot '.claude\settings.json') $ClaudeDir -Force
     New-Item -ItemType Directory -Force -Path $CodexDir | Out-Null
@@ -348,6 +420,7 @@ function Copy-Configs {
 function Remove-Configs {
     Write-Host 'Removing installed configs...' -ForegroundColor Yellow
     Remove-Item (Join-Path $env:USERPROFILE '_vimrc') -Force -ErrorAction SilentlyContinue
+    Remove-RcBlock $PwshProfile
     Remove-Item (Join-Path $ClaudeDir 'settings.json') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $CodexDir 'config.toml') -Force -ErrorAction SilentlyContinue
     Remove-ManagedFile (Join-Path $RepoRoot '.claude\CLAUDE.md') (Join-Path $ClaudeDir 'CLAUDE.md')
@@ -385,6 +458,8 @@ function Invoke-Upgrade {
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade vim.vim exited with code $LASTEXITCODE" }
         winget upgrade --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade OpenJS.NodeJS.LTS exited with code $LASTEXITCODE" }
+        winget upgrade --id JanDeDobbeleer.OhMyPosh -e --accept-source-agreements --accept-package-agreements
+        if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade JanDeDobbeleer.OhMyPosh exited with code $LASTEXITCODE" }
     } else {
         Write-Warning 'winget not found, skipping winget upgrades.'
     }
@@ -406,6 +481,15 @@ function Invoke-Upgrade {
         npm install -g '@openai/codex'
         if ($LASTEXITCODE -ne 0) { Write-Warning "Codex CLI update exited with code $LASTEXITCODE" }
     }
+    Write-Host 'Updating PowerShell modules...' -ForegroundColor Yellow
+    foreach ($module in 'posh-git', 'PSReadLine') {
+        if (-not (Get-Module $module -ListAvailable)) { continue }
+        try {
+            Update-Module $module -Force -ErrorAction Stop
+        } catch {
+            Write-Warning "Update-Module $module failed: $_"
+        }
+    }
     Write-Host 'Updating vim plugins...' -ForegroundColor Yellow
     vim +PlugUpdate +qall
     Write-Host 'Upgrade finished. Restart your terminal to apply.' -ForegroundColor Green
@@ -422,6 +506,7 @@ function Invoke-Install {
     Install-Uv
     Install-Nvm
     Install-Codex
+    Install-PsModules
     Install-NerdFont
     Install-VimPlug
     Copy-Configs
