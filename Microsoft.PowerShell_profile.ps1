@@ -78,8 +78,14 @@ if (Get-Module posh-git -ListAvailable) {
 }
 
 if (Get-Command oh-my-posh -ErrorAction SilentlyContinue) {
-    $Theme = Join-Path $env:POSH_THEMES_PATH 'clean-detailed.omp.json'
-    if (Test-Path $Theme) {
+    # POSH_THEMES_PATH is set by the oh-my-posh installer, so it is still empty
+    # in a session started before that install. Join-Path would throw on the
+    # empty value and leave the prompt uninitialised, so guard it and fall back
+    # to the built-in theme.
+    $Theme = if ($env:POSH_THEMES_PATH) {
+        Join-Path $env:POSH_THEMES_PATH 'clean-detailed.omp.json'
+    } else { $null }
+    if ($Theme -and (Test-Path $Theme)) {
         oh-my-posh init pwsh --config $Theme | Invoke-Expression
     } else {
         oh-my-posh init pwsh | Invoke-Expression

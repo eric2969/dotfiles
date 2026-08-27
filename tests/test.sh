@@ -126,6 +126,11 @@ printf 'v3\n' > "$FILE_DST"
 assert "remove-file deletes unmodified copy" test ! -f "$FILE_DST"
 
 # ---------- make update / uninstall end-to-end ----------
+# make is not part of a stock Windows install; the setup.ps1 suite below covers
+# the same install/uninstall policies there.
+if ! command -v make >/dev/null 2>&1; then
+  echo "make update / uninstall (skipped: make not found)"
+else
 echo "make update / uninstall"
 FAKE_HOME="$SANDBOX/home"
 mkdir -p "$FAKE_HOME/.claude/skills/my-own-skill"
@@ -160,6 +165,19 @@ assert "uninstall removes Codex config" test ! -f "$FAKE_HOME/.codex/config.toml
 assert "uninstall removes CLAUDE.md" test ! -f "$FAKE_HOME/.claude/CLAUDE.md"
 assert "uninstall keeps user-authored skill" test -f "$FAKE_HOME/.claude/skills/my-own-skill/SKILL.md"
 assert "uninstall removes rc block" bash -c "! grep -q '>>> dotfiles managed block' '$FAKE_HOME/.zshrc' 2>/dev/null"
+fi
+
+# ---------- setup.ps1 (Windows only) ----------
+if command -v pwsh >/dev/null 2>&1; then
+  echo "setup.ps1"
+  if pwsh -NoProfile -File "$REPO/tests/test.ps1"; then
+    pass "setup.ps1 suite"
+  else
+    fail "setup.ps1 suite"
+  fi
+else
+  echo "setup.ps1 (skipped: pwsh not found)"
+fi
 
 # ---------- result ----------
 if [ "$FAILURES" -gt 0 ]; then

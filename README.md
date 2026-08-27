@@ -19,7 +19,7 @@ make install
 | `make upgrade` | Upgrade installed OS packages, curl-installed tools (claude, uv, nvm), zinit, and vim plugins |
 | `make reinstall` | Clean out installed configs and plugin managers, then install fresh (`uninstall` + `install`) |
 | `make uninstall` | Remove installed configs and plugin managers |
-| `make test` | Run the sandboxed test suite (never touches your real `$HOME`) |
+| `make test` | Run the sandboxed test suite (never touches your real `$HOME`); on Windows run `tests/test.sh` or `tests/test.ps1` directly |
 
 **How each config is managed on update / uninstall:**
 
@@ -36,18 +36,23 @@ To skip OS package installation, run the bootstrap directly: `./setup.sh -n`.
 
 ```powershell
 git clone https://github.com/eric2969/dotfiles.git; cd dotfiles
-.\setup.ps1                          # install
-.\setup.ps1 -SkipDeps                # install without winget packages
+.\setup.ps1                          # install (elevated shell required)
+.\setup.ps1 -SkipDeps                # install without winget packages (elevated shell required)
 .\setup.ps1 -Action update           # copy configs only
 .\setup.ps1 -Action update -Force    # also overwrite locally modified skills / CLAUDE.md
 .\setup.ps1 -Action upgrade          # upgrade installed packages and tools
-.\setup.ps1 -Action reinstall        # remove, then install fresh
+.\setup.ps1 -Action reinstall        # remove, then install fresh (elevated shell required)
 .\setup.ps1 -Action uninstall        # remove
 ```
 
-Shared skills live in `~/.agents/skills` and follow the same manifest policy as on Unix. Both `~/.claude/skills` and `~/.codex/skills` link to those shared copies; locally modified or unrelated skills are preserved. The installer enables Windows Developer Mode so non-elevated processes can create symbolic links (run setup from an elevated PowerShell for the registry change).
+`install` and `reinstall` refuse to run outside an elevated PowerShell, because
+Chocolatey, nvm-windows and Developer Mode all install machine-wide. Everything
+else — `update`, `upgrade`, `uninstall` — works as a normal user, so config-only
+runs never need admin.
 
-Windows installs git/vim/Node.js LTS/oh-my-posh (winget), Chocolatey, Claude Code, Codex CLI, uv, nvm-windows (choco), the posh-git and PSReadLine modules, the Nerd Font, vim-plug, `_vimrc`, the PowerShell 7 profile, and agent settings. zsh/tmux configs are Unix-only. Run the install from an elevated PowerShell (Chocolatey and Developer Mode setup need admin).
+Shared skills live in `~/.agents/skills` and follow the same manifest policy as on Unix. Both `~/.claude/skills` and `~/.codex/skills` link to those shared copies; locally modified or unrelated skills are preserved. The installer enables Windows Developer Mode so non-elevated processes can create symbolic links; that registry write needs admin, and when it is unavailable the run warns and keeps going — every config is still copied, only the skill symlinks may fail.
+
+Windows installs git/vim/oh-my-posh (winget), Chocolatey, Claude Code, Codex CLI, uv, nvm-windows (choco), the posh-git and PSReadLine modules, the Nerd Font, vim-plug, `_vimrc`, the PowerShell 7 profile, and agent settings. zsh/tmux configs are Unix-only. **Node.js is owned by nvm-windows**, mirroring Unix: nothing is installed through winget, and `nvm install lts` provides the npm that Codex CLI needs. A tool that cannot be installed (no Chocolatey, no nvm) is reported as a warning and skipped — it never aborts the rest of the run.
 
 The PowerShell profile is installed into `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (resolved through the real Documents folder, so OneDrive redirection works) as a managed block, the same policy `.zshrc` gets on Unix — anything you add outside the markers survives updates and uninstall.
 
@@ -60,7 +65,8 @@ The PowerShell profile is installed into `Documents/PowerShell/Microsoft.PowerSh
 - `setup.ps1` — Windows installer; also manages the marked block inside the PowerShell profile
 - `Microsoft.PowerShell_profile.ps1` — PowerShell 7 profile: prompt (posh-git + oh-my-posh), PSReadLine history/prediction, and the same aliases as `.bash_profile`
 - `Makefile` — help / install / update / upgrade / reinstall / uninstall / test entry points
-- `tests/test.sh` — sandboxed test suite; the `verify` skill runs it (plus shellcheck) before every commit
+- `tests/test.sh` — sandboxed test suite; the `verify` skill runs it (plus shellcheck) before every commit. It also runs `tests/test.ps1` when `pwsh` is present, and skips the `make` section when `make` is not
+- `tests/test.ps1` — sandboxed `setup.ps1` suite (throwaway `USERPROFILE`, needs no admin); run it directly with `pwsh -NoProfile -File tests/test.ps1`
 - `.zshrc` — zsh-only layer (see below)
 - `.bash_profile` — shared shell layer (see below)
 - `.vimrc` — vim-plug plugins

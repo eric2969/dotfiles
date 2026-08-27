@@ -2,11 +2,17 @@
 .SYNOPSIS
     Windows installer for these dotfiles.
 .DESCRIPTION
-    install   - install dependencies (git, vim, node, choco, claude, codex, uv, nvm), Nerd Font, vim-plug, then copy configs
+    install   - install dependencies (git, vim, choco, claude, codex, uv, nvm + Node LTS), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
     upgrade   - upgrade installed packages and tools (winget, choco, claude, codex, uv, vim plugins)
     reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
+
+    Node.js is owned by nvm-windows, mirroring setup.sh on Unix; nothing here
+    installs Node through winget, because a second Node would shadow nvm's.
+
+    'install' and 'reinstall' need an elevated shell (Chocolatey and nvm-windows
+    install machine-wide). The other actions run fine as a normal user.
 #>
 param(
     [ValidateSet('install', 'update', 'upgrade', 'reinstall', 'uninstall')]
@@ -27,6 +33,25 @@ $CodexDir = Join-Path $env:USERPROFILE '.codex'
 # itself runs under Windows PowerShell 5.1.
 $PwshProfile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Microsoft.PowerShell_profile.ps1'
 
+function Test-Elevated {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    ([Security.Principal.WindowsPrincipal]$identity).IsInRole(
+        [Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# Installers write PATH to the registry, which the running process never sees.
+# Merge the registry entries in instead of replacing $env:PATH, so directories
+# that only exist in this process (a just-run installer's own additions) survive.
+function Update-SessionPath {
+    $dirs = @($env:PATH -split ';' | Where-Object { $_ })
+    foreach ($scope in 'Machine', 'User') {
+        foreach ($dir in ([Environment]::GetEnvironmentVariable('PATH', $scope) -split ';')) {
+            if ($dir -and $dirs -notcontains $dir) { $dirs += $dir }
+        }
+    }
+    $env:PATH = $dirs -join ';'
+}
+
 function Install-Dependencies {
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
         throw 'winget not found. Install "App Installer" from the Microsoft Store first.'
@@ -36,11 +61,9 @@ function Install-Dependencies {
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install Git.Git exited with code $LASTEXITCODE" }
     winget install --id vim.vim -e --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install vim.vim exited with code $LASTEXITCODE" }
-    winget install --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
-    if ($LASTEXITCODE -ne 0) { Write-Warning "winget install OpenJS.NodeJS.LTS exited with code $LASTEXITCODE" }
     winget install --id JanDeDobbeleer.OhMyPosh -e --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install JanDeDobbeleer.OhMyPosh exited with code $LASTEXITCODE" }
-    $env:PATH = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH', 'User')
+    Update-SessionPath
 }
 
 # Modules the profile prompt and line editor rely on; both degrade gracefully
@@ -65,8 +88,15 @@ function Install-Choco {
         Write-Host 'Chocolatey already installed.'
         return
     }
-    Write-Host 'Installing Chocolatey (requires an elevated shell)...' -ForegroundColor Yellow
+    if (-not (Test-Elevated)) {
+        Write-Warning 'Chocolatey needs an elevated shell, skipping. Re-run setup.ps1 as Administrator to install it.'
+        return
+    }
+    Write-Host 'Installing Chocolatey...' -ForegroundColor Yellow
     Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    # The installer only puts choco on the registry PATH; without this the very
+    # next step (Install-Nvm) would not find the command it just installed.
+    Update-SessionPath
 }
 
 function Install-Claude {
@@ -92,29 +122,70 @@ function Install-Nvm {
         Write-Host 'nvm already installed.'
         return
     }
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+        Write-Warning 'Chocolatey not available, skipping nvm-windows.'
+        return
+    }
     Write-Host 'Installing nvm-windows via Chocolatey...' -ForegroundColor Yellow
     choco install nvm -y
-    if ($LASTEXITCODE -ne 0) { Write-Warning "choco install nvm exited with code $LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "choco install nvm exited with code $LASTEXITCODE"
+        return
+    }
+    # nvm-windows drives Node through NVM_HOME / NVM_SYMLINK, which the installer
+    # writes to the registry only; import them so Install-Codex can use nvm now.
+    foreach ($name in 'NVM_HOME', 'NVM_SYMLINK') {
+        $value = [Environment]::GetEnvironmentVariable($name, 'Machine')
+        if ($value) { Set-Item "Env:$name" $value }
+    }
+    Update-SessionPath
 }
 
+# Mirrors install_codex in setup.sh: nvm provides Node, Node provides npm,
+# npm provides Codex. A missing link is a warning, never a failed install.
 function Install-Codex {
     if (Get-Command codex -ErrorAction SilentlyContinue) {
         Write-Host 'Codex CLI already installed.'
         return
     }
     if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
-        throw 'npm not found. Install Node.js LTS before installing Codex CLI.'
+        if (-not (Get-Command nvm -ErrorAction SilentlyContinue)) {
+            Write-Warning 'Neither npm nor nvm found, skipping Codex CLI.'
+            return
+        }
+        Write-Host 'Installing Node.js LTS via nvm...' -ForegroundColor Yellow
+        nvm install lts
+        if ($LASTEXITCODE -ne 0) { Write-Warning "nvm install lts exited with code $LASTEXITCODE" }
+        nvm use lts
+        if ($LASTEXITCODE -ne 0) { Write-Warning "nvm use lts exited with code $LASTEXITCODE" }
+        Update-SessionPath
+        if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+            Write-Warning 'npm still not on PATH, skipping Codex CLI. Restart the terminal and re-run setup.ps1.'
+            return
+        }
     }
     Write-Host 'Installing Codex CLI...' -ForegroundColor Yellow
     npm install -g '@openai/codex'
-    if ($LASTEXITCODE -ne 0) { throw "npm install @openai/codex exited with code $LASTEXITCODE" }
+    if ($LASTEXITCODE -ne 0) { Write-Warning "npm install @openai/codex exited with code $LASTEXITCODE" }
 }
 
+# Developer Mode lets non-elevated processes create the skill symlinks. Writing
+# it needs admin, so this only reports the problem: it must never take the whole
+# config copy down with it, and it is a no-op once the value is already set.
 function Enable-SymbolicLinks {
     $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+    $name = 'AllowDevelopmentWithoutDevLicense'
+    if ((Get-ItemProperty $key -Name $name -ErrorAction SilentlyContinue).$name -eq 1) {
+        Write-Host 'Windows Developer Mode already enabled.'
+        return
+    }
     Write-Host 'Enabling Windows Developer Mode for symbolic links...' -ForegroundColor Yellow
-    New-Item -Path $key -Force | Out-Null
-    New-ItemProperty -Path $key -Name AllowDevelopmentWithoutDevLicense -PropertyType DWord -Value 1 -Force | Out-Null
+    try {
+        New-Item -Path $key -Force -ErrorAction Stop | Out-Null
+        New-ItemProperty -Path $key -Name $name -PropertyType DWord -Value 1 -Force -ErrorAction Stop | Out-Null
+    } catch {
+        Write-Warning "Could not enable Developer Mode ($_). Skill symlinks may fail; re-run setup.ps1 as Administrator."
+    }
 }
 
 function Install-NerdFont {
@@ -402,7 +473,6 @@ function Remove-RcBlock([string]$Dest) {
 
 function Copy-Configs {
     Write-Host 'Copying configs...' -ForegroundColor Yellow
-    Enable-SymbolicLinks
     Copy-Item (Join-Path $RepoRoot '.vimrc') (Join-Path $env:USERPROFILE '_vimrc') -Force
     Install-RcBlock (Join-Path $RepoRoot 'Microsoft.PowerShell_profile.ps1') $PwshProfile
     New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
@@ -412,6 +482,9 @@ function Copy-Configs {
     Install-ManagedFile (Join-Path $RepoRoot '.claude\CLAUDE.md') (Join-Path $ClaudeDir 'CLAUDE.md')
     Copy-Skills
     Remove-LegacyClaudeSkillCopies
+    # Only the symlinks below need Developer Mode, so everything above is already
+    # on disk even when this cannot be enabled.
+    Enable-SymbolicLinks
     Sync-SkillLinks (Join-Path $ClaudeDir 'skills')
     Sync-SkillLinks (Join-Path $CodexDir 'skills')
     Write-Host 'Configs updated.'
@@ -456,17 +529,19 @@ function Invoke-Upgrade {
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade Git.Git exited with code $LASTEXITCODE" }
         winget upgrade --id vim.vim -e --accept-source-agreements --accept-package-agreements
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade vim.vim exited with code $LASTEXITCODE" }
-        winget upgrade --id OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
-        if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade OpenJS.NodeJS.LTS exited with code $LASTEXITCODE" }
         winget upgrade --id JanDeDobbeleer.OhMyPosh -e --accept-source-agreements --accept-package-agreements
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade JanDeDobbeleer.OhMyPosh exited with code $LASTEXITCODE" }
     } else {
         Write-Warning 'winget not found, skipping winget upgrades.'
     }
     if (Get-Command choco -ErrorAction SilentlyContinue) {
-        Write-Host 'Upgrading Chocolatey packages...' -ForegroundColor Yellow
-        choco upgrade nvm -y
-        if ($LASTEXITCODE -ne 0) { Write-Warning "choco upgrade nvm exited with code $LASTEXITCODE" }
+        if (Test-Elevated) {
+            Write-Host 'Upgrading Chocolatey packages...' -ForegroundColor Yellow
+            choco upgrade nvm -y
+            if ($LASTEXITCODE -ne 0) { Write-Warning "choco upgrade nvm exited with code $LASTEXITCODE" }
+        } else {
+            Write-Warning 'Chocolatey upgrades need an elevated shell, skipping nvm.'
+        }
     }
     if (Get-Command claude -ErrorAction SilentlyContinue) {
         Write-Host 'Updating Claude Code...' -ForegroundColor Yellow
@@ -496,6 +571,9 @@ function Invoke-Upgrade {
 }
 
 function Invoke-Install {
+    if (-not (Test-Elevated)) {
+        throw 'Run install from an elevated PowerShell (Chocolatey, nvm-windows and Developer Mode need admin). Use "setup.ps1 -Action update" to copy configs only.'
+    }
     if ($SkipDeps) {
         Write-Warning 'Skipping dependency installation (-SkipDeps)'
     } else {
@@ -513,10 +591,14 @@ function Invoke-Install {
     Write-Host 'Install finished. Restart your terminal to apply.' -ForegroundColor Green
 }
 
-switch ($Action) {
-    'install'   { Invoke-Install }
-    'update'    { Copy-Configs }
-    'upgrade'   { Invoke-Upgrade }
-    'reinstall' { Remove-Configs; Invoke-Install }
-    'uninstall' { Remove-Configs }
+# Dot-sourcing loads the functions without running anything, which is how
+# tests/test.ps1 exercises them against a sandbox HOME.
+if ($MyInvocation.InvocationName -ne '.') {
+    switch ($Action) {
+        'install'   { Invoke-Install }
+        'update'    { Copy-Configs }
+        'upgrade'   { Invoke-Upgrade }
+        'reinstall' { Remove-Configs; Invoke-Install }
+        'uninstall' { Remove-Configs }
+    }
 }
