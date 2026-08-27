@@ -7,6 +7,7 @@
     upgrade   - upgrade installed packages and tools (winget, choco, claude, codex, uv, vim plugins)
     reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
+    doctor    - report why the PowerShell prompt is not showing up (read-only)
 
     Node.js is owned by nvm-windows, mirroring setup.sh on Unix; nothing here
     installs Node through winget, because a second Node would shadow nvm's.
@@ -15,7 +16,7 @@
     install machine-wide). The other actions run fine as a normal user.
 #>
 param(
-    [ValidateSet('install', 'update', 'upgrade', 'reinstall', 'uninstall')]
+    [ValidateSet('install', 'update', 'upgrade', 'reinstall', 'uninstall', 'doctor')]
     [string]$Action = 'install',
     # Overwrite locally modified skills and CLAUDE.md on update (mirrors FORCE=1 for make).
     [switch]$Force,
@@ -57,6 +58,11 @@ function Install-Dependencies {
         throw 'winget not found. Install "App Installer" from the Microsoft Store first.'
     }
     Write-Host 'Installing dependencies via winget...' -ForegroundColor Yellow
+    # PowerShell 7 first: the profile is installed into its Documents\PowerShell
+    # folder, so on a machine with only Windows PowerShell 5.1 nothing would ever
+    # read the file this script writes.
+    winget install --id Microsoft.PowerShell -e --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) { Write-Warning "winget install Microsoft.PowerShell exited with code $LASTEXITCODE" }
     winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install Git.Git exited with code $LASTEXITCODE" }
     winget install --id vim.vim -e --accept-source-agreements --accept-package-agreements
@@ -471,8 +477,89 @@ function Remove-RcBlock([string]$Dest) {
     }
 }
 
+# A Restricted or AllSigned policy makes PowerShell skip the profile without a
+# word, which looks exactly like "the prompt config did nothing". Only the
+# CurrentUser scope is touched, so this needs no elevation.
+function Enable-ProfileExecution {
+    if ((Get-ExecutionPolicy) -notin 'Restricted', 'AllSigned') { return }
+    Write-Host 'Allowing local scripts to run (ExecutionPolicy RemoteSigned, current user)...' -ForegroundColor Yellow
+    try {
+        Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force -ErrorAction Stop
+    } catch {
+        Write-Warning "Could not relax the execution policy ($_). The profile will not load until it is set to RemoteSigned."
+    }
+}
+
+# Read-only report for the one failure this script cannot fix from here: the
+# profile is on disk but the shell never loads it. Returns the problem count.
+function Invoke-Doctor {
+    Write-Host 'PowerShell profile checkup' -ForegroundColor Yellow
+
+    $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
+    $onDisk = Test-Path $PwshProfile
+    $policy = Get-ExecutionPolicy
+    $fonts = @(Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Fonts" -Filter 'SauceCodePro*.ttf' -ErrorAction SilentlyContinue) +
+             @(Get-ChildItem "$env:windir\Fonts" -Filter 'SauceCodePro*.ttf' -ErrorAction SilentlyContinue)
+
+    $checks = @(
+        [pscustomobject]@{
+            Ok      = [bool]$pwsh
+            Message = "PowerShell 7 installed$(if ($pwsh) { " ($($pwsh.Source))" })"
+            Fix     = 'winget install --id Microsoft.PowerShell -e, then open the "PowerShell" (not "Windows PowerShell") terminal'
+        }
+        [pscustomobject]@{
+            Ok      = $PSVersionTable.PSEdition -eq 'Core'
+            Message = "this shell is PowerShell 7 (running $($PSVersionTable.PSEdition) $($PSVersionTable.PSVersion))"
+            Fix     = 'only pwsh reads this profile; Windows PowerShell 5.1 reads Documents\WindowsPowerShell instead'
+        }
+        [pscustomobject]@{
+            Ok      = $onDisk
+            Message = "profile file exists ($PwshProfile)"
+            Fix     = 'run: .\setup.ps1 -Action update'
+        }
+        [pscustomobject]@{
+            Ok      = $onDisk -and ((Get-Content $PwshProfile) -contains $BlockBegin)
+            Message = 'profile contains the dotfiles managed block'
+            Fix     = 'run: .\setup.ps1 -Action update'
+        }
+        [pscustomobject]@{
+            Ok      = $policy -notin 'Restricted', 'AllSigned'
+            Message = "execution policy allows the profile to run (is: $policy)"
+            Fix     = 'run: Set-ExecutionPolicy RemoteSigned -Scope CurrentUser'
+        }
+        [pscustomobject]@{
+            Ok      = [bool](Get-Command oh-my-posh -ErrorAction SilentlyContinue)
+            Message = 'oh-my-posh installed'
+            Fix     = 'winget install --id JanDeDobbeleer.OhMyPosh -e, then restart the terminal'
+        }
+        [pscustomobject]@{
+            Ok      = $fonts.Count -gt 0
+            Message = 'SauceCodePro Nerd Font installed'
+            Fix     = 'run install again, then set the terminal font to "SauceCodePro Nerd Font" or the prompt icons stay as empty boxes'
+        }
+    )
+
+    foreach ($check in $checks) {
+        if ($check.Ok) {
+            Write-Host "  ok    $($check.Message)"
+        } else {
+            Write-Host "  FIX   $($check.Message)" -ForegroundColor Red
+            Write-Host "        -> $($check.Fix)"
+        }
+    }
+
+    $problems = @($checks | Where-Object { -not $_.Ok }).Count
+    if ($problems -eq 0) {
+        Write-Host 'No problems found. Open a new PowerShell 7 tab to see the prompt.' -ForegroundColor Green
+    } else {
+        Write-Host "$problems problem(s) found; fix the lines marked FIX above." -ForegroundColor Red
+    }
+    $problems
+}
+
 function Copy-Configs {
     Write-Host 'Copying configs...' -ForegroundColor Yellow
+    Enable-ProfileExecution
     Copy-Item (Join-Path $RepoRoot '.vimrc') (Join-Path $env:USERPROFILE '_vimrc') -Force
     Install-RcBlock (Join-Path $RepoRoot 'Microsoft.PowerShell_profile.ps1') $PwshProfile
     New-Item -ItemType Directory -Force -Path $ClaudeDir | Out-Null
@@ -525,6 +612,8 @@ function Remove-Configs {
 function Invoke-Upgrade {
     if (Get-Command winget -ErrorAction SilentlyContinue) {
         Write-Host 'Upgrading winget packages...' -ForegroundColor Yellow
+        winget upgrade --id Microsoft.PowerShell -e --accept-source-agreements --accept-package-agreements
+        if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade Microsoft.PowerShell exited with code $LASTEXITCODE" }
         winget upgrade --id Git.Git -e --accept-source-agreements --accept-package-agreements
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade Git.Git exited with code $LASTEXITCODE" }
         winget upgrade --id vim.vim -e --accept-source-agreements --accept-package-agreements
@@ -588,7 +677,8 @@ function Invoke-Install {
     Install-NerdFont
     Install-VimPlug
     Copy-Configs
-    Write-Host 'Install finished. Restart your terminal to apply.' -ForegroundColor Green
+    Write-Host 'Install finished. Open a new PowerShell 7 ("pwsh") tab to apply.' -ForegroundColor Green
+    Write-Host 'If the prompt still looks plain, run: .\setup.ps1 -Action doctor' -ForegroundColor Green
 }
 
 # Dot-sourcing loads the functions without running anything, which is how
@@ -600,5 +690,6 @@ if ($MyInvocation.InvocationName -ne '.') {
         'upgrade'   { Invoke-Upgrade }
         'reinstall' { Remove-Configs; Invoke-Install }
         'uninstall' { Remove-Configs }
+        'doctor'    { Invoke-Doctor | Out-Null }
     }
 }

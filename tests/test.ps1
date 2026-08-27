@@ -134,6 +134,39 @@ try {
         @(Get-Content $PwshProfile | Where-Object { $_ -match '>>> dotfiles managed block' }).Count -eq 1
     }
 
+    # ---------- Invoke-Doctor ----------
+    Write-Host 'Invoke-Doctor'
+    $doctorOut = ''
+    Assert 'reports a healthy profile as installed' {
+        $script:doctorOut = Invoke-Doctor 6>&1 | Out-String
+        $script:doctorOut -match 'profile contains the dotfiles managed block'
+    }
+    Assert 'passes the managed-block check after an install' {
+        $doctorOut -notmatch 'FIX +profile contains the dotfiles managed block'
+    }
+    Assert 'returns the problem count as a number' {
+        $count = Invoke-Doctor 6>$null
+        $count -is [int] -and $count -ge 0
+    }
+
+    # ---------- Enable-ProfileExecution ----------
+    Write-Host 'Enable-ProfileExecution'
+    $policyBefore = Get-ExecutionPolicy
+    if ($policyBefore -in 'Restricted', 'AllSigned') {
+        # Calling it here would really change the account's policy, so only the
+        # guard is exercised; the branch that relaxes it is covered by the FIX
+        # line Invoke-Doctor prints in exactly this situation.
+        Write-Host '  skip  no-op guard (policy currently blocks scripts)'
+        Assert 'doctor flags the blocking execution policy' {
+            (Invoke-Doctor 6>&1 | Out-String) -match 'FIX +execution policy'
+        }
+    } else {
+        Assert 'leaves a permitting execution policy untouched' {
+            Enable-ProfileExecution 3>$null
+            (Get-ExecutionPolicy) -eq $policyBefore
+        }
+    }
+
     # ---------- Remove-Configs ----------
     Write-Host 'Remove-Configs'
     Assert 'runs to completion unelevated' { Remove-Configs 3>$null | Out-Null; $true }
@@ -145,6 +178,9 @@ try {
     Assert 'removes Codex config' { -not (Test-Path (Join-Path $Home_ '.codex\config.toml')) }
     Assert 'removes shared skills' {
         -not (Test-Path (Join-Path $Home_ '.agents\skills\skill-authoring'))
+    }
+    Assert 'doctor flags the missing block after uninstall' {
+        (Invoke-Doctor 6>&1 | Out-String) -match 'FIX +profile contains the dotfiles managed block'
     }
 
 } finally {

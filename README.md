@@ -43,6 +43,7 @@ git clone https://github.com/eric2969/dotfiles.git; cd dotfiles
 .\setup.ps1 -Action upgrade          # upgrade installed packages and tools
 .\setup.ps1 -Action reinstall        # remove, then install fresh (elevated shell required)
 .\setup.ps1 -Action uninstall        # remove
+.\setup.ps1 -Action doctor           # report why the prompt is not showing up
 ```
 
 `install` and `reinstall` refuse to run outside an elevated PowerShell, because
@@ -52,9 +53,30 @@ runs never need admin.
 
 Shared skills live in `~/.agents/skills` and follow the same manifest policy as on Unix. Both `~/.claude/skills` and `~/.codex/skills` link to those shared copies; locally modified or unrelated skills are preserved. The installer enables Windows Developer Mode so non-elevated processes can create symbolic links; that registry write needs admin, and when it is unavailable the run warns and keeps going — every config is still copied, only the skill symlinks may fail.
 
-Windows installs git/vim/oh-my-posh (winget), Chocolatey, Claude Code, Codex CLI, uv, nvm-windows (choco), the posh-git and PSReadLine modules, the Nerd Font, vim-plug, `_vimrc`, the PowerShell 7 profile, and agent settings. zsh/tmux configs are Unix-only. **Node.js is owned by nvm-windows**, mirroring Unix: nothing is installed through winget, and `nvm install lts` provides the npm that Codex CLI needs. A tool that cannot be installed (no Chocolatey, no nvm) is reported as a warning and skipped — it never aborts the rest of the run.
+Windows installs PowerShell 7/git/vim/oh-my-posh (winget), Chocolatey, Claude Code, Codex CLI, uv, nvm-windows (choco), the posh-git and PSReadLine modules, the Nerd Font, vim-plug, `_vimrc`, the PowerShell 7 profile, and agent settings. zsh/tmux configs are Unix-only. **Node.js is owned by nvm-windows**, mirroring Unix: nothing is installed through winget, and `nvm install lts` provides the npm that Codex CLI needs. A tool that cannot be installed (no Chocolatey, no nvm) is reported as a warning and skipped — it never aborts the rest of the run.
 
 The PowerShell profile is installed into `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (resolved through the real Documents folder, so OneDrive redirection works) as a managed block, the same policy `.zshrc` gets on Unix — anything you add outside the markers survives updates and uninstall.
+
+### The prompt is not showing up
+
+Run `.\setup.ps1 -Action doctor`. It is read-only and prints a `FIX` line with the
+exact command for whatever is wrong. The usual causes, in order:
+
+1. **You are in Windows PowerShell 5.1, not PowerShell 7.** Only `pwsh` reads
+   `Documents/PowerShell/`; 5.1 reads `Documents/WindowsPowerShell/` and finds nothing
+   there. The blue-icon "Windows PowerShell" and Win+X entries are 5.1 — open the
+   "PowerShell" profile in Windows Terminal instead.
+2. **PowerShell 7 is not installed.** The installer now installs it, but a run from
+   before that fix did not: `winget install --id Microsoft.PowerShell -e`.
+3. **The execution policy is `Restricted` or `AllSigned`**, so the profile is skipped
+   silently. `update` relaxes it for the current user; by hand it is
+   `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`.
+4. **The Nerd Font is missing or the terminal is not using it.** The prompt loads, but
+   every icon renders as an empty box. Set the terminal font to *SauceCodePro Nerd Font*.
+
+Note the Windows prompt is **oh-my-posh** with the `clean-detailed` theme, not
+powerlevel10k — `.p10k.zsh` is zsh-only and is never installed on Windows, so the two
+prompts do not look the same.
 
 ## What's inside
 
