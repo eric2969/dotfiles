@@ -1,5 +1,7 @@
-# PowerShell 7 profile — Windows counterpart of .zshrc / .bash_profile.
-# Every section is a no-op when the tool it configures is not installed.
+# PowerShell profile — Windows counterpart of .zshrc / .bash_profile.
+# Shared by pwsh 7 and Windows PowerShell 5.1 (the 5.1 path is a symlink to
+# this file), so everything here must run on both. Every section is a no-op
+# when the tool it configures is not installed.
 
 ##############################
 #          EXPORTS           #
@@ -29,14 +31,18 @@ if (Get-Module PSReadLine -ListAvailable) {
     Set-PSReadLineOption -MaximumHistoryCount 100000
     Set-PSReadLineOption -BellStyle None
     # Predictions need a real terminal; setting them errors out when output is
-    # redirected (pwsh -c, editor tasks, CI).
-    if (-not [Console]::IsOutputRedirected) {
+    # redirected (pwsh -c, editor tasks, CI). They also need PSReadLine 2.1+,
+    # which Windows PowerShell 5.1 does not ship — it is stuck on 2.0.0 unless
+    # the module was installed into its own module path.
+    $PSReadLineVersion = (Get-Module PSReadLine).Version
+    if (-not [Console]::IsOutputRedirected -and $PSReadLineVersion -ge [version]'2.1.0') {
         Set-PSReadLineOption -PredictionSource History
         # ListView needs PSReadLine 2.2+; older versions only know InlineView.
-        if ((Get-Module PSReadLine).Version -ge [version]'2.2.0') {
+        if ($PSReadLineVersion -ge [version]'2.2.0') {
             Set-PSReadLineOption -PredictionViewStyle ListView
         }
     }
+    Remove-Variable PSReadLineVersion
 
     # Arrow keys search history by what is already typed (zsh-autosuggestions feel).
     Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward

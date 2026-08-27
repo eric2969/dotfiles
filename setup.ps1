@@ -33,6 +33,10 @@ $CodexDir = Join-Path $env:USERPROFILE '.codex'
 # Documents folders are handled. Always the pwsh path, even when setup.ps1
 # itself runs under Windows PowerShell 5.1.
 $PwshProfile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'PowerShell\Microsoft.PowerShell_profile.ps1'
+# Windows PowerShell 5.1 reads its own profile path and never sees the one
+# above. It is symlinked to the pwsh profile so anything that still starts 5.1
+# — herdr's fallback shell, older launchers — gets the same prompt and aliases.
+$WinPsProfile = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Microsoft.PowerShell_profile.ps1'
 
 function Test-Elevated {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -514,6 +518,45 @@ function Remove-RcBlock([string]$Dest) {
     }
 }
 
+# Point the Windows PowerShell 5.1 profile at the pwsh one, the same policy the
+# skill links get: a symlink we own is refreshed, a real file the user wrote is
+# never touched. The managed block still lives in a single file, so 5.1 and 7
+# cannot drift apart.
+function Sync-ProfileLink {
+    if (-not (Test-Path $PwshProfile)) { return }
+    if (Test-Path $WinPsProfile) {
+        $item = Get-Item $WinPsProfile -Force
+        if ($item.LinkType -eq 'SymbolicLink' -and @($item.Target)[0] -eq $PwshProfile) {
+            Write-Host 'Windows PowerShell 5.1 profile link up to date.'
+            return
+        }
+        if ($item.LinkType -eq 'SymbolicLink' -and $Force) {
+            Remove-Item $WinPsProfile -Force
+        } else {
+            Write-Warning "A Windows PowerShell 5.1 profile already exists at $WinPsProfile, keeping it (use -Force to replace it with the link)."
+            return
+        }
+    }
+    New-Item -ItemType Directory -Force -Path (Split-Path $WinPsProfile) | Out-Null
+    try {
+        New-Item -ItemType SymbolicLink -Path $WinPsProfile -Target $PwshProfile -ErrorAction Stop | Out-Null
+        Write-Host 'Windows PowerShell 5.1 profile linked to the pwsh profile.'
+    } catch {
+        Write-Warning "Could not link the Windows PowerShell 5.1 profile ($_). Enable Developer Mode or re-run as Administrator."
+    }
+}
+
+function Remove-ProfileLink {
+    if (-not (Test-Path $WinPsProfile)) { return }
+    $item = Get-Item $WinPsProfile -Force
+    if ($item.LinkType -eq 'SymbolicLink' -and @($item.Target)[0] -eq $PwshProfile) {
+        Remove-Item $WinPsProfile -Force
+        Write-Host 'Windows PowerShell 5.1 profile link removed.'
+    } else {
+        Write-Warning "The Windows PowerShell 5.1 profile at $WinPsProfile is not our link, keeping it."
+    }
+}
+
 # A Restricted or AllSigned policy makes PowerShell skip the profile without a
 # word, which looks exactly like "the prompt config did nothing". Only the
 # CurrentUser scope is touched, so this needs no elevation.
@@ -547,7 +590,12 @@ function Invoke-Doctor {
         [pscustomobject]@{
             Ok      = $PSVersionTable.PSEdition -eq 'Core'
             Message = "this shell is PowerShell 7 (running $($PSVersionTable.PSEdition) $($PSVersionTable.PSVersion))"
-            Fix     = 'only pwsh reads this profile; Windows PowerShell 5.1 reads Documents\WindowsPowerShell instead'
+            Fix     = 'not fatal: 5.1 shares this profile through the link checked below, but PSReadLine predictions need pwsh 7'
+        }
+        [pscustomobject]@{
+            Ok      = (Test-Path $WinPsProfile) -and (Get-Item $WinPsProfile -Force).LinkType -eq 'SymbolicLink'
+            Message = "Windows PowerShell 5.1 profile links to the pwsh one ($WinPsProfile)"
+            Fix     = 'run: .\setup.ps1 -Action update (creating the link needs Developer Mode or admin)'
         }
         [pscustomobject]@{
             Ok      = $onDisk
@@ -610,6 +658,7 @@ function Copy-Configs {
     # Only the symlinks below need Developer Mode, so everything above is already
     # on disk even when this cannot be enabled.
     Enable-SymbolicLinks
+    Sync-ProfileLink
     Sync-SkillLinks (Join-Path $ClaudeDir 'skills')
     Sync-SkillLinks (Join-Path $CodexDir 'skills')
     Write-Host 'Configs updated.'
@@ -618,6 +667,7 @@ function Copy-Configs {
 function Remove-Configs {
     Write-Host 'Removing installed configs...' -ForegroundColor Yellow
     Remove-Item (Join-Path $env:USERPROFILE '_vimrc') -Force -ErrorAction SilentlyContinue
+    Remove-ProfileLink
     Remove-RcBlock $PwshProfile
     Remove-Item (Join-Path $ClaudeDir 'settings.json') -Force -ErrorAction SilentlyContinue
     Remove-Item (Join-Path $CodexDir 'config.toml') -Force -ErrorAction SilentlyContinue

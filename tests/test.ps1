@@ -57,6 +57,7 @@ try {
 # MyDocuments ignores USERPROFILE, so point the profile at the sandbox by hand.
 $env:USERPROFILE = $Home_
 $PwshProfile = Join-Path $Home_ 'Documents\PowerShell\Microsoft.PowerShell_profile.ps1'
+$WinPsProfile = Join-Path $Home_ 'Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1'
 
 try {
 
@@ -123,6 +124,13 @@ try {
         }
         Assert 'links generated (non-repo) shared skills too' {
             (Get-Item (Join-Path $Home_ '.claude\skills\generated-only') -Force).LinkType -eq 'SymbolicLink'
+        }
+        Assert 'links the Windows PowerShell 5.1 profile to the pwsh one' {
+            $item = Get-Item $WinPsProfile -Force
+            $item.LinkType -eq 'SymbolicLink' -and @($item.Target)[0] -eq $PwshProfile
+        }
+        Assert '5.1 profile serves the same content as the pwsh one' {
+            (Get-Content $WinPsProfile -Raw) -eq (Get-Content $PwshProfile -Raw)
         }
     }
 
@@ -193,9 +201,19 @@ try {
     Assert 'removes shared skills' {
         -not (Test-Path (Join-Path $Home_ '.agents\skills\skill-authoring'))
     }
+    Assert 'removes the 5.1 profile link' { -not (Test-Path $WinPsProfile) }
     Assert 'doctor flags the missing block after uninstall' {
         (Invoke-Doctor 6>&1 | Out-String) -match 'FIX +profile contains the dotfiles managed block'
     }
+
+    Write-Host 'Sync-ProfileLink (user-written 5.1 profile)'
+    New-Item -ItemType Directory -Force -Path (Split-Path $WinPsProfile) | Out-Null
+    Set-Content -Path $WinPsProfile -Value '# my own 5.1 profile'
+    Copy-Configs 3>$null | Out-Null
+    Assert 'keeps a user-written 5.1 profile' {
+        (Get-Content $WinPsProfile) -contains '# my own 5.1 profile'
+    }
+    Remove-Item $WinPsProfile -Force
 
 } finally {
     $env:USERPROFILE = $RealUserProfile

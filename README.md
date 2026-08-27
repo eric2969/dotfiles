@@ -29,6 +29,7 @@ make install
 | `~/.zshrc`, `~/.bash_profile`, `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Block-managed: only the marked block (`# >>> dotfiles managed block >>> … <<<`) is rewritten/removed; your own lines are always kept |
 | `~/.claude/CLAUDE.md`, `~/.agents/skills/*` | Manifest-managed: unmodified copies auto-update, copies you edited locally are kept (use `FORCE=1` to overwrite) |
 | `~/.claude/skills/*`, `~/.codex/skills/*` | Symlinks to the shared copies in `~/.agents/skills`; unrelated and system skills are kept |
+| `Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1` | Symlink to the pwsh 7 profile so Windows PowerShell 5.1 shares it; a profile you wrote yourself is kept (use `-Force` to replace it with the link) |
 | `~/.agents/skills/herdr` | Generated from the installed binary (`herdr --skill`) on every update/upgrade, so it always matches the herdr release; removed on uninstall |
 
 To skip OS package installation, run the bootstrap directly: `./setup.sh -n`.
@@ -56,17 +57,17 @@ Shared skills live in `~/.agents/skills` and follow the same manifest policy as 
 
 Windows installs PowerShell 7/git/vim/oh-my-posh (winget), Chocolatey, Claude Code, Codex CLI, herdr, uv, nvm-windows (choco), the posh-git and PSReadLine modules, the Nerd Font, vim-plug, `_vimrc`, the PowerShell 7 profile, and agent settings. zsh/tmux configs are Unix-only. **Node.js is owned by nvm-windows**, mirroring Unix: nothing is installed through winget, and `nvm install lts` provides the npm that Codex CLI needs. A tool that cannot be installed (no Chocolatey, no nvm) is reported as a warning and skipped — it never aborts the rest of the run.
 
-The PowerShell profile is installed into `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (resolved through the real Documents folder, so OneDrive redirection works) as a managed block, the same policy `.zshrc` gets on Unix — anything you add outside the markers survives updates and uninstall.
+The PowerShell profile is installed into `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (resolved through the real Documents folder, so OneDrive redirection works) as a managed block, the same policy `.zshrc` gets on Unix — anything you add outside the markers survives updates and uninstall. Windows PowerShell 5.1 reads a different path (`Documents/WindowsPowerShell/…`), so that one is symlinked to the pwsh profile — a single file serves both editions and they cannot drift apart. The profile therefore has to run on 5.1 too: PSReadLine predictions are version-guarded, because 5.1 ships PSReadLine 2.0.0 and only 2.1+ knows `-PredictionSource`.
 
 ### The prompt is not showing up
 
 Run `.\setup.ps1 -Action doctor`. It is read-only and prints a `FIX` line with the
 exact command for whatever is wrong. The usual causes, in order:
 
-1. **You are in Windows PowerShell 5.1, not PowerShell 7.** Only `pwsh` reads
-   `Documents/PowerShell/`; 5.1 reads `Documents/WindowsPowerShell/` and finds nothing
-   there. The blue-icon "Windows PowerShell" and Win+X entries are 5.1 — open the
-   "PowerShell" profile in Windows Terminal instead.
+1. **You are in Windows PowerShell 5.1 and the profile link is missing.** 5.1 reads
+   `Documents/WindowsPowerShell/`, which `update` symlinks to the pwsh profile; without
+   Developer Mode or admin that link cannot be created and 5.1 finds nothing there.
+   `doctor` reports it. The blue-icon "Windows PowerShell" and Win+X entries are 5.1.
 2. **PowerShell 7 is not installed.** The installer now installs it, but a run from
    before that fix did not: `winget install --id Microsoft.PowerShell -e`.
 3. **The execution policy is `Restricted` or `AllSigned`**, so the profile is skipped
