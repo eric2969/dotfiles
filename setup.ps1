@@ -4,7 +4,7 @@
 .DESCRIPTION
     install   - install dependencies (git, vim, choco, claude, codex, herdr, uv, nvm + Node LTS), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
-    upgrade   - upgrade installed packages and tools (winget, choco, claude, codex, herdr, uv, vim plugins)
+    upgrade   - upgrade installed packages and tools (winget, choco, claude, codex, herdr, uv, PowerShell modules for 7 and 5.1, vim plugins)
     reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
     doctor    - report why the PowerShell prompt is not showing up (read-only)
@@ -91,6 +91,53 @@ function Install-PsModules {
             Write-Warning "Install-Module $module failed: $_"
         }
     }
+}
+
+# The same two modules for Windows PowerShell 5.1, which has its own module path
+# and therefore cannot see anything installed for pwsh. Now that both editions
+# share one profile, 5.1 would otherwise sit on the in-box PSReadLine 2.0.0 (no
+# predictions) with no posh-git at all.
+function Install-WinPsModules([switch]$Update) {
+    $winPs = Join-Path $env:windir 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if (-not (Test-Path $winPs)) {
+        Write-Warning 'Windows PowerShell 5.1 not found, skipping its modules.'
+        return
+    }
+    # Literal here-string: everything below is evaluated by 5.1, not by us.
+    $script = @'
+$ErrorActionPreference = 'Continue'
+# 5.1 negotiates TLS 1.0 by default; the PowerShell Gallery rejects it.
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+if (-not (Get-PackageProvider -Name NuGet -ListAvailable -ErrorAction SilentlyContinue)) {
+    Install-PackageProvider -Name NuGet -Scope CurrentUser -Force | Out-Null
+}
+# PSReadLine ships in-box at 2.0.0, so "is it installed" is a version question:
+# -PredictionSource needs 2.1+. posh-git is absent entirely, any version will do.
+$wanted = [ordered]@{ 'posh-git' = [version]'0.0'; 'PSReadLine' = [version]'2.1.0' }
+foreach ($module in $wanted.Keys) {
+    $have = Get-Module $module -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1
+    if ($have -and $have.Version -ge $wanted[$module]) {
+        if (-not $DoUpdate) {
+            Write-Host "PowerShell 5.1 module '$module' already installed ($($have.Version))."
+            continue
+        }
+        Write-Host "Updating PowerShell 5.1 module '$module'..."
+        try { Update-Module $module -Force -ErrorAction Stop }
+        catch { Write-Warning "Update-Module $module (5.1) failed: $_" }
+        continue
+    }
+    Write-Host "Installing PowerShell 5.1 module '$module'..."
+    try {
+        # The in-box PSReadLine is signed by a different publisher than the
+        # gallery build, which blocks the side-by-side install without this.
+        Install-Module $module -Scope CurrentUser -Force -AllowClobber -SkipPublisherCheck -ErrorAction Stop
+    } catch {
+        Write-Warning "Install-Module $module (5.1) failed: $_"
+    }
+}
+'@
+    $prelude = "`$DoUpdate = `$$($Update.IsPresent)"
+    & $winPs -NoProfile -ExecutionPolicy Bypass -Command "$prelude`n$script"
 }
 
 function Install-Choco {
@@ -755,6 +802,8 @@ function Invoke-Upgrade {
             Write-Warning "Update-Module $module failed: $_"
         }
     }
+    Write-Host 'Updating Windows PowerShell 5.1 modules...' -ForegroundColor Yellow
+    Install-WinPsModules -Update
     Write-Host 'Updating vim plugins...' -ForegroundColor Yellow
     vim +PlugUpdate +qall
     Write-Host 'Upgrade finished. Restart your terminal to apply.' -ForegroundColor Green
@@ -776,6 +825,7 @@ function Invoke-Install {
     Install-Codex
     Install-Herdr
     Install-PsModules
+    Install-WinPsModules
     Install-NerdFont
     Install-VimPlug
     Copy-Configs
