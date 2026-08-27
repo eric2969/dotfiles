@@ -13,7 +13,7 @@ description: >-
 # Verify
 
 > ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/verify/SKILL.md`.
-> Update it there and sync with `make update` (macOS/Linux) or `./setup.ps1 update` (Windows).
+> Update it there and sync with `make update` (macOS/Linux) or `.\setup.ps1 -Action update` (Windows).
 > Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
 
 **Purpose:** Single verification gate for all code changes — catch lint, type, and test

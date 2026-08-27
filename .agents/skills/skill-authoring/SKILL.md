@@ -13,7 +13,7 @@ description: >-
 # Skill Authoring
 
 > ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/skill-authoring/SKILL.md`.
-> Update it there and sync with `make update` (macOS/Linux) or `./setup.ps1 update` (Windows).
+> Update it there and sync with `make update` (macOS/Linux) or `.\setup.ps1 -Action update` (Windows).
 > Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
 
 **Purpose:** Enforce a consistent, high-quality standard when authoring or updating any
@@ -78,7 +78,7 @@ inline `**Trigger:**` and `**Purpose:**` format is deprecated — move these int
    > ⚠️ This skill is version-controlled in `.claude/skills/<name>/SKILL.md`.
    > When project conventions change, update this file in the same PR.
    > To sync to your user layer: run the project's sync command
-   > (in the dotfiles repo: `make update` or `./setup.ps1 update`).
+   > (in the dotfiles repo: `make update` or `.\setup.ps1 -Action update`).
    ```
 
 7. **User-layer generics use placeholders**: user-layer skills must not contain
@@ -108,7 +108,7 @@ inline `**Trigger:**` and `**Purpose:**` format is deprecated — move these int
    update must be in the same PR as the convention change that prompted it.
 
 5. **Sync user-layer**: after updating a project-layer skill, run the project's sync
-   command (in the dotfiles repo: `make update` or `./setup.ps1 update`) to update the
+   command (in the dotfiles repo: `make update` or `.\setup.ps1 -Action update`) to update the
    user-layer copy. Sync auto-updates unmodified user-layer copies; copies you edited
    locally are kept unless you pass `FORCE=1` (make) / `-Force` (setup.ps1).
 

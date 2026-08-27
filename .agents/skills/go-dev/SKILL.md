@@ -10,7 +10,7 @@ description: >-
 # Go Development
 
 > ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/go-dev/SKILL.md`.
-> Update it there and sync with `make update` (macOS/Linux) or `./setup.ps1 update` (Windows).
+> Update it there and sync with `make update` (macOS/Linux) or `.\setup.ps1 -Action update` (Windows).
 > Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
 
 **Purpose:** Apply consistent Go standards (style, errors, testing, modern features)
