@@ -93,6 +93,11 @@ try {
 
     # ---------- Copy-Configs ----------
     Write-Host 'Copy-Configs'
+    # Stands in for a generated skill (herdr): it lives in the shared dir without
+    # existing in the repo, and must still be linked into the agent dirs.
+    $generatedSkill = Join-Path $Home_ '.agents\skills\generated-only'
+    New-Item -ItemType Directory -Force -Path $generatedSkill | Out-Null
+    Set-Content -Path (Join-Path $generatedSkill 'SKILL.md') -Value '# generated'
     Assert 'runs to completion unelevated' { Copy-Configs 3>$null | Out-Null; $true }
     Assert 'installs _vimrc' { Test-Path (Join-Path $Home_ '_vimrc') }
     Assert 'installs the profile block' {
@@ -115,6 +120,9 @@ try {
         }
         Assert 'links skills into Codex' {
             (Get-Item (Join-Path $Home_ '.codex\skills\skill-authoring') -Force).LinkType -eq 'SymbolicLink'
+        }
+        Assert 'links generated (non-repo) shared skills too' {
+            (Get-Item (Join-Path $Home_ '.claude\skills\generated-only') -Force).LinkType -eq 'SymbolicLink'
         }
     }
 

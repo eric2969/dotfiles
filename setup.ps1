@@ -366,6 +366,9 @@ function Copy-Skills {
 # instead of vendored. Writing it into the shared skills dir lets Sync-SkillLinks
 # expose it to Claude and Codex like every other skill.
 function Install-HerdrSkill {
+    # herdr's installer writes PATH to the registry only, so a shell started
+    # before the install (or by 'update' on its own) would not see the binary.
+    Update-SessionPath
     $herdr = Get-Command herdr -ErrorAction SilentlyContinue
     if (-not $herdr) {
         Write-Host 'herdr not installed, skipping its agent skill.'
@@ -388,7 +391,9 @@ function Sync-SkillLinks([string]$TargetRoot) {
     $managed = @()
     if (Test-Path $linkManifest) { $managed = @(Get-Content $linkManifest) }
 
-    Get-ChildItem (Join-Path $RepoRoot '.agents\skills') -Directory | ForEach-Object {
+    # Linked from the installed shared dir, not from the repo, so generated
+    # skills (herdr) are covered too — this is what skill-links.sh does on Unix.
+    Get-ChildItem $SkillsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
         $name = $_.Name
         $source = Join-Path $SkillsDir $name
         $dest = Join-Path $TargetRoot $name
@@ -411,8 +416,8 @@ function Sync-SkillLinks([string]$TargetRoot) {
         }
         if ($managed -notcontains $name) { $managed += $name }
     }
-    $repoNames = @(Get-ChildItem (Join-Path $RepoRoot '.agents\skills') -Directory).Name
-    @($managed) | Where-Object { $repoNames -notcontains $_ } | ForEach-Object {
+    $sharedNames = @(Get-ChildItem $SkillsDir -Directory -ErrorAction SilentlyContinue).Name
+    @($managed) | Where-Object { $sharedNames -notcontains $_ } | ForEach-Object {
         $dest = Join-Path $TargetRoot $_
         if ((Test-Path $dest) -and (Get-Item $dest -Force).LinkType -eq 'SymbolicLink') {
             Remove-Item $dest -Force
