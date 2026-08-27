@@ -125,6 +125,32 @@ printf 'v3\n' > "$FILE_DST"
 "$REPO/skills-sync.sh" remove-file "$FILE_SRC" "$FILE_DST"
 assert "remove-file deletes unmodified copy" test ! -f "$FILE_DST"
 
+# ---------- herdr agent skill ----------
+# The skill is generated from the installed binary, so a stub herdr stands in
+# for the real one and keeps the test independent of what is on this machine.
+echo "setup.sh skill"
+HERDR_HOME="$SANDBOX/herdr-home"
+STUB_BIN="$SANDBOX/stub-bin"
+mkdir -p "$STUB_BIN" "$HERDR_HOME"
+cat > "$STUB_BIN/herdr" <<'STUB'
+#!/usr/bin/env bash
+[ "$1" = "--skill" ] || exit 1
+echo "# herdr skill v1"
+STUB
+chmod +x "$STUB_BIN/herdr"
+
+HOME="$HERDR_HOME" PATH="$STUB_BIN:$PATH" "$REPO/setup.sh" skill >/dev/null
+assert "skill writes the herdr skill from the binary"   grep -q 'herdr skill v1' "$HERDR_HOME/.agents/skills/herdr/SKILL.md"
+
+cat > "$STUB_BIN/herdr" <<'STUB'
+#!/usr/bin/env bash
+exit 1
+STUB
+BROKEN_HOME="$SANDBOX/herdr-broken-home"
+mkdir -p "$BROKEN_HOME"
+HOME="$BROKEN_HOME" PATH="$STUB_BIN:$PATH" "$REPO/setup.sh" skill >/dev/null 2>&1
+assert "failing herdr --skill leaves no partial skill"   test ! -e "$BROKEN_HOME/.agents/skills/herdr/SKILL.md"
+
 # ---------- make update / uninstall end-to-end ----------
 # make is not part of a stock Windows install; the setup.ps1 suite below covers
 # the same install/uninstall policies there.
@@ -158,7 +184,12 @@ assert "update keeps user-modified CLAUDE.md" grep -q '# my local rules' "$FAKE_
 HOME="$FAKE_HOME" make -C "$REPO" update FORCE=1 >/dev/null 2>&1
 assert "FORCE=1 overwrites modified CLAUDE.md" bash -c "! grep -q '# my local rules' '$FAKE_HOME/.claude/CLAUDE.md'"
 
+# Generated skills are not in the repo manifest, so uninstall removes them by name.
+mkdir -p "$FAKE_HOME/.agents/skills/herdr"
+printf '# herdr skill
+' > "$FAKE_HOME/.agents/skills/herdr/SKILL.md"
 HOME="$FAKE_HOME" make -C "$REPO" uninstall >/dev/null 2>&1
+assert "uninstall removes the generated herdr skill" test ! -d "$FAKE_HOME/.agents/skills/herdr"
 assert "uninstall removes shared repo skills" test ! -d "$FAKE_HOME/.agents/skills/skill-authoring"
 assert "uninstall removes Codex skill links" test ! -L "$FAKE_HOME/.codex/skills/skill-authoring"
 assert "uninstall removes Codex config" test ! -f "$FAKE_HOME/.codex/config.toml"

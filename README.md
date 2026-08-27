@@ -1,6 +1,6 @@
 # Dotfiles
 
-Personal environment setup: zsh (zinit + powerlevel10k), vim (vim-plug), tmux, Claude Code, and Codex CLI.
+Personal environment setup: zsh (zinit + powerlevel10k), vim (vim-plug), tmux, Claude Code, Codex CLI, and herdr.
 
 Configs and shared skills are copied into `$HOME`, so this repo can be deleted after installation. Only the agent-facing skill entries are symlinks, and they point to `~/.agents/skills` rather than back to this repo.
 
@@ -16,7 +16,7 @@ make install
 | `make` / `make help` | List available targets |
 | `make install` | Install dependencies + tools, copy configs, install vim plugins |
 | `make update` | Copy configs into `$HOME` only (re-run any time); `FORCE=1` overwrites locally modified skills and CLAUDE.md |
-| `make upgrade` | Upgrade installed OS packages, curl-installed tools (claude, uv, nvm), zinit, and vim plugins |
+| `make upgrade` | Upgrade installed OS packages, curl-installed tools (claude, uv, nvm, herdr), zinit, and vim plugins |
 | `make reinstall` | Clean out installed configs and plugin managers, then install fresh (`uninstall` + `install`) |
 | `make uninstall` | Remove installed configs and plugin managers |
 | `make test` | Run the sandboxed test suite (never touches your real `$HOME`); on Windows run `tests/test.sh` or `tests/test.ps1` directly |
@@ -29,6 +29,7 @@ make install
 | `~/.zshrc`, `~/.bash_profile`, `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` | Block-managed: only the marked block (`# >>> dotfiles managed block >>> … <<<`) is rewritten/removed; your own lines are always kept |
 | `~/.claude/CLAUDE.md`, `~/.agents/skills/*` | Manifest-managed: unmodified copies auto-update, copies you edited locally are kept (use `FORCE=1` to overwrite) |
 | `~/.claude/skills/*`, `~/.codex/skills/*` | Symlinks to the shared copies in `~/.agents/skills`; unrelated and system skills are kept |
+| `~/.agents/skills/herdr` | Generated from the installed binary (`herdr --skill`) on every update/upgrade, so it always matches the herdr release; removed on uninstall |
 
 To skip OS package installation, run the bootstrap directly: `./setup.sh -n`.
 
@@ -53,7 +54,7 @@ runs never need admin.
 
 Shared skills live in `~/.agents/skills` and follow the same manifest policy as on Unix. Both `~/.claude/skills` and `~/.codex/skills` link to those shared copies; locally modified or unrelated skills are preserved. The installer enables Windows Developer Mode so non-elevated processes can create symbolic links; that registry write needs admin, and when it is unavailable the run warns and keeps going — every config is still copied, only the skill symlinks may fail.
 
-Windows installs PowerShell 7/git/vim/oh-my-posh (winget), Chocolatey, Claude Code, Codex CLI, uv, nvm-windows (choco), the posh-git and PSReadLine modules, the Nerd Font, vim-plug, `_vimrc`, the PowerShell 7 profile, and agent settings. zsh/tmux configs are Unix-only. **Node.js is owned by nvm-windows**, mirroring Unix: nothing is installed through winget, and `nvm install lts` provides the npm that Codex CLI needs. A tool that cannot be installed (no Chocolatey, no nvm) is reported as a warning and skipped — it never aborts the rest of the run.
+Windows installs PowerShell 7/git/vim/oh-my-posh (winget), Chocolatey, Claude Code, Codex CLI, herdr, uv, nvm-windows (choco), the posh-git and PSReadLine modules, the Nerd Font, vim-plug, `_vimrc`, the PowerShell 7 profile, and agent settings. zsh/tmux configs are Unix-only. **Node.js is owned by nvm-windows**, mirroring Unix: nothing is installed through winget, and `nvm install lts` provides the npm that Codex CLI needs. A tool that cannot be installed (no Chocolatey, no nvm) is reported as a warning and skipped — it never aborts the rest of the run.
 
 The PowerShell profile is installed into `Documents/PowerShell/Microsoft.PowerShell_profile.ps1` (resolved through the real Documents folder, so OneDrive redirection works) as a managed block, the same policy `.zshrc` gets on Unix — anything you add outside the markers survives updates and uninstall.
 
@@ -80,7 +81,7 @@ prompts do not look the same.
 
 ## What's inside
 
-- `setup.sh` — Unix bootstrapper: OS packages, Sauce Code Pro Nerd Font, zinit, vim-plug, Claude Code, uv, nvm, default shell
+- `setup.sh` — Unix bootstrapper: OS packages, Sauce Code Pro Nerd Font, zinit, vim-plug, Claude Code, Codex CLI, herdr, uv, nvm, default shell (`./setup.sh skill` regenerates the herdr agent skill on its own)
 - `rcblock.sh` — manages the marked dotfiles block inside `~/.zshrc` / `~/.bash_profile`
 - `skills-sync.sh` — manifest-based sync of shared skills into `~/.agents/skills`, plus single-file mode (`install-file` / `remove-file`) used for `~/.claude/CLAUDE.md`
 - `skill-links.sh` — links shared skills into both `~/.claude/skills` and `~/.codex/skills`

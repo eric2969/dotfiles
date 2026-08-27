@@ -166,6 +166,56 @@ install_codex() {
     npm install -g @openai/codex
 }
 
+install_herdr() {
+    if command -v herdr >/dev/null 2>&1; then
+        echo "herdr already installed."
+        return 0
+    fi
+    info "Installing herdr..."
+    if command -v brew >/dev/null 2>&1; then
+        brew install herdr
+    else
+        curl -fsSL https://herdr.dev/install.sh | sh
+    fi
+}
+
+# herdr's installer drops the binary in ~/.local/bin, which only lands on PATH
+# once .bash_profile is re-sourced; look there too so the skill can be written
+# in the same run that installed herdr.
+herdr_bin() {
+    if command -v herdr >/dev/null 2>&1; then
+        command -v herdr
+        return 0
+    fi
+    if [ -x "$HOME/.local/bin/herdr" ]; then
+        echo "$HOME/.local/bin/herdr"
+        return 0
+    fi
+    return 1
+}
+
+# herdr ships an agent skill matched to the installed binary, so it is generated
+# instead of vendored. Writing it into the shared skills dir lets skill-links.sh
+# expose it to Claude and Codex like every other skill.
+install_herdr_skill() {
+    local bin dir tmp
+    if ! bin=$(herdr_bin); then
+        echo "herdr not installed, skipping its agent skill."
+        return 0
+    fi
+    dir="$HOME/.agents/skills/herdr"
+    mkdir -p "$dir"
+    tmp="$dir/SKILL.md.tmp"
+    if "$bin" --skill > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+        mv "$tmp" "$dir/SKILL.md"
+        ok "Skill 'herdr' synced from the installed binary."
+    else
+        rm -f "$tmp"
+        warn "herdr --skill failed, skipping its agent skill."
+        rmdir "$dir" 2>/dev/null || true
+    fi
+}
+
 upgrade_deps() {
     info "Upgrading OS packages..."
     if command -v brew >/dev/null 2>&1; then      # macOS
@@ -197,6 +247,11 @@ upgrade_tools() {
     if command -v npm >/dev/null 2>&1; then
         info "Updating Codex CLI..."
         npm install -g @openai/codex || warn "Codex CLI update failed"
+    fi
+    if command -v herdr >/dev/null 2>&1; then
+        info "Updating herdr..."
+        herdr update || warn "herdr update failed"
+        install_herdr_skill
     fi
     # nvm has no self-update; re-run the pinned installer to sync to NVM_VERSION.
     if [ -d "${NVM_DIR:-$HOME/.nvm}" ]; then
@@ -246,6 +301,12 @@ set_default_shell() {
 }
 
 main() {
+    # 'make update' calls this so the herdr skill is refreshed alongside the
+    # repo-managed ones, without duplicating the generation logic there.
+    if [ "${1:-}" = "skill" ]; then
+        install_herdr_skill
+        return 0
+    fi
     if [ "${1:-}" = "upgrade" ]; then
         upgrade_deps || warn "OS package upgrade encountered errors"
         upgrade_tools
@@ -270,6 +331,8 @@ main() {
     install_uv
     install_nvm
     install_codex
+    install_herdr
+    install_herdr_skill
     set_default_shell
     ok "Bootstrap finished. Run 'make update' to copy configs, then restart your terminal."
 }

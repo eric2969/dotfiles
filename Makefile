@@ -16,7 +16,7 @@ install: bootstrap update ## Full install: deps + tools + configs + vim plugins
 	vim +PlugInstall +qall
 	@echo "Install finished. Restart your terminal to apply."
 
-bootstrap: ## Install dependencies and tools (zinit, vim-plug, fonts, claude, codex)
+bootstrap: ## Install dependencies and tools (zinit, vim-plug, fonts, claude, codex, herdr)
 	./setup.sh
 
 update: ## Copy config files into $$HOME (repeatable)
@@ -29,6 +29,7 @@ update: ## Copy config files into $$HOME (repeatable)
 	./skills-sync.sh install-file .claude/CLAUDE.md "$(HOME)/.claude/CLAUDE.md" "$(FORCE)"
 	./skills-sync.sh install .agents/skills "$(HOME)/.agents/skills" "$(FORCE)"
 	@if [ -f "$(HOME)/.claude/skills/.dotfiles-manifest" ]; then ./skills-sync.sh remove .agents/skills "$(HOME)/.claude/skills"; fi
+	@./setup.sh skill
 	./skill-links.sh install "$(HOME)/.agents/skills" "$(HOME)/.claude/skills" "$(FORCE)"
 	./skill-links.sh install "$(HOME)/.agents/skills" "$(HOME)/.codex/skills" "$(FORCE)"
 	@echo "Configs updated."
@@ -49,6 +50,7 @@ uninstall: ## Remove installed configs and plugin managers (keeps ~/.claude hist
 	./skill-links.sh remove "$(HOME)/.agents/skills" "$(HOME)/.claude/skills"
 	./skill-links.sh remove "$(HOME)/.agents/skills" "$(HOME)/.codex/skills"
 	./skills-sync.sh remove .agents/skills "$(HOME)/.agents/skills"
+	rm -rf $(HOME)/.agents/skills/herdr
 	rm -rf $(HOME)/.vim/plugged $(HOME)/.vim/autoload/plug.vim
 	rm -rf $${XDG_DATA_HOME:-$(HOME)/.local/share}/zinit
 	@echo "Uninstalled. (~/.zsh_history and the rest of ~/.claude were kept.)"
