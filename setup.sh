@@ -206,7 +206,9 @@ install_herdr_skill() {
     dir="$HOME/.agents/skills/herdr"
     mkdir -p "$dir"
     tmp="$dir/SKILL.md.tmp"
-    if "$bin" --skill > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+    # stdin is detached so herdr cannot swallow input typed ahead for the
+    # interactive 'fm license' prompt that may follow in the same run.
+    if "$bin" --skill < /dev/null > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
         mv "$tmp" "$dir/SKILL.md"
         ok "Skill 'herdr' synced from the installed binary."
     else
@@ -214,6 +216,100 @@ install_herdr_skill() {
         warn "herdr --skill failed, skipping its agent skill."
         rmdir "$dir" 2>/dev/null || true
     fi
+}
+
+# Skills under .agents/skills-optional only make sense on some machines, so they
+# are installed by the checks below instead of by the unconditional skill sync.
+# They keep their own manifest: sharing one would make each sync prune the
+# other's skills as "no longer in repo".
+REPO_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+OPTIONAL_SKILLS_SRC="$REPO_DIR/.agents/skills-optional"
+OPTIONAL_SKILLS_MANIFEST='.dotfiles-manifest-optional'
+
+sync_optional_skills() { # sync_optional_skills <install|remove>
+    local action=$1
+    if [ "$action" = install ]; then
+        SKILLS_MANIFEST_NAME="$OPTIONAL_SKILLS_MANIFEST" "$REPO_DIR/skills-sync.sh" \
+            install "$OPTIONAL_SKILLS_SRC" "$HOME/.agents/skills" "${FORCE:-0}"
+        return
+    fi
+    # Nothing to remove unless an earlier run installed them.
+    [ -f "$HOME/.agents/skills/$OPTIONAL_SKILLS_MANIFEST" ] || return 0
+    SKILLS_MANIFEST_NAME="$OPTIONAL_SKILLS_MANIFEST" "$REPO_DIR/skills-sync.sh" \
+        remove "$OPTIONAL_SKILLS_SRC" "$HOME/.agents/skills"
+}
+
+# Prints why this machine cannot run Apple Foundation Models and returns 1, or
+# prints nothing and returns 0. Apple's on-device model needs Apple silicon.
+apple_fm_platform_check() {
+    if [ "$(uname -s)" != Darwin ]; then
+        echo "not macOS"
+        return 1
+    fi
+    if [ "$(uname -m)" != arm64 ]; then
+        echo "not Apple silicon"
+        return 1
+    fi
+    if ! command -v fm >/dev/null 2>&1; then
+        echo "the fm CLI is not installed (it ships with recent macOS releases)"
+        return 1
+    fi
+}
+
+fm_license_agreed() {
+    # Captured rather than piped: under pipefail, grep -q closing the pipe early
+    # could turn a positive answer into a SIGPIPE failure.
+    local status
+    status=$(NO_COLOR=1 fm license --status 2>/dev/null || true)
+    grep -q '^Agreed to license' <<<"$status"
+}
+
+# fm refuses to be scripted past its Legal Notice & Terms: there is no flag to
+# agree, only an interactive prompt. So the agreement happens here, as part of
+# setup, with the terms on screen and the answer typed by the person.
+ensure_fm_license() {
+    if fm_license_agreed; then
+        return 0
+    fi
+    if [ ! -t 0 ]; then
+        echo "fm Legal Notice & Terms not agreed to and this session is non-interactive."
+        echo "Run 'fm license' in a terminal, then 'make update' again."
+        return 1
+    fi
+    info "The Foundation Models CLI asks you to agree to its Legal Notice & Terms:"
+    fm license || warn "fm license exited with an error"
+    fm_license_agreed
+}
+
+# 'fm models' exits non-zero whenever any listed model is unavailable, Private
+# Cloud Compute included, so readiness is read from its text.
+apple_fm_model_ready() {
+    local listing
+    listing=$(NO_COLOR=1 fm models 2>&1 || true)
+    grep -Eq '✓ +system' <<<"$listing"
+}
+
+install_apple_fm_skill() {
+    local reason
+    if [ ! -d "$OPTIONAL_SKILLS_SRC/apple-fm" ]; then
+        return 0
+    fi
+    if ! reason=$(apple_fm_platform_check); then
+        echo "Skill 'apple-fm' skipped: $reason."
+        sync_optional_skills remove
+        return 0
+    fi
+    if ! ensure_fm_license; then
+        warn "Skill 'apple-fm' skipped: fm Legal Notice & Terms not agreed to."
+        sync_optional_skills remove
+        return 0
+    fi
+    if ! apple_fm_model_ready; then
+        warn "Skill 'apple-fm' skipped: the on-device model is not ready (is Apple Intelligence enabled?)."
+        sync_optional_skills remove
+        return 0
+    fi
+    sync_optional_skills install
 }
 
 upgrade_deps() {
@@ -301,10 +397,16 @@ set_default_shell() {
 }
 
 main() {
-    # 'make update' calls this so the herdr skill is refreshed alongside the
-    # repo-managed ones, without duplicating the generation logic there.
+    # 'make update' calls this so the generated and machine-dependent skills are
+    # refreshed alongside the repo-managed ones, without duplicating logic there.
     if [ "${1:-}" = "skill" ]; then
         install_herdr_skill
+        install_apple_fm_skill
+        return 0
+    fi
+    # 'make uninstall' calls this; optional skills use their own manifest.
+    if [ "${1:-}" = "remove-optional-skills" ]; then
+        sync_optional_skills remove
         return 0
     fi
     if [ "${1:-}" = "upgrade" ]; then
@@ -333,6 +435,7 @@ main() {
     install_codex
     install_herdr
     install_herdr_skill
+    install_apple_fm_skill
     set_default_shell
     ok "Bootstrap finished. Run 'make update' to copy configs, then restart your terminal."
 }

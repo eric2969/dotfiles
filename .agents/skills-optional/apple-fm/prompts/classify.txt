@@ -1,0 +1,1 @@
+Classify each non-empty input line. Return one item per line, in order. Copy the line into input unchanged. Choose the single best label.

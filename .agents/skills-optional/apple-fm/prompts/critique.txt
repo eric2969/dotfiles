@@ -1,0 +1,1 @@
+Review the proposed plan. Identify only overlooked edge cases, ambiguous assumptions, missing constraints and unnecessary complexity. Each concern must point at something specific in the plan. Do not rewrite the plan and do not praise it. At most five concerns. Return an empty list when nothing is wrong.

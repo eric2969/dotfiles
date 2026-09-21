@@ -139,7 +139,8 @@ echo "# herdr skill v1"
 STUB
 chmod +x "$STUB_BIN/herdr"
 
-HOME="$HERDR_HOME" PATH="$STUB_BIN:$PATH" "$REPO/setup.sh" skill >/dev/null
+# stdin is detached so a machine with a real, not-yet-agreed fm cannot prompt.
+HOME="$HERDR_HOME" PATH="$STUB_BIN:$PATH" "$REPO/setup.sh" skill </dev/null >/dev/null
 assert "skill writes the herdr skill from the binary"   grep -q 'herdr skill v1' "$HERDR_HOME/.agents/skills/herdr/SKILL.md"
 
 cat > "$STUB_BIN/herdr" <<'STUB'
@@ -148,8 +149,89 @@ exit 1
 STUB
 BROKEN_HOME="$SANDBOX/herdr-broken-home"
 mkdir -p "$BROKEN_HOME"
-HOME="$BROKEN_HOME" PATH="$STUB_BIN:$PATH" "$REPO/setup.sh" skill >/dev/null 2>&1
+HOME="$BROKEN_HOME" PATH="$STUB_BIN:$PATH" "$REPO/setup.sh" skill </dev/null >/dev/null 2>&1
 assert "failing herdr --skill leaves no partial skill"   test ! -e "$BROKEN_HOME/.agents/skills/herdr/SKILL.md"
+
+# ---------- apple-fm optional skill ----------
+# Stub uname and fm decide what the machine looks like, so every branch of the
+# gate runs the same way on macOS, Linux and CI.
+echo "setup.sh skill (apple-fm gate)"
+AFM_STUB="$SANDBOX/afm-stub"
+mkdir -p "$AFM_STUB"
+cat > "$AFM_STUB/uname" <<'STUB'
+#!/usr/bin/env bash
+case "${1:-}" in
+  -s) echo "${STUB_UNAME_S:-Darwin}" ;;
+  -m) echo "${STUB_UNAME_M:-arm64}" ;;
+  *)  echo "${STUB_UNAME_S:-Darwin}" ;;
+esac
+STUB
+cat > "$AFM_STUB/fm" <<'STUB'
+#!/usr/bin/env bash
+case "$1 ${2:-}" in
+  "license --status")
+    if [ "${STUB_FM_LICENSE:-agreed}" = agreed ]; then
+      echo "Agreed to license FM1 version 1.1 on 2026-01-01."
+    else
+      echo "Not yet agreed to license FM1."
+      exit 1
+    fi ;;
+  "license "*) echo "fm license must not be run without a terminal" >&2; exit 3 ;;
+  "models "*)
+    if [ "${STUB_FM_MODEL:-ready}" = ready ]; then mark="✓"; else mark="✗"; fi
+    printf 'Apple Foundation Models\n  %s system (Stub)\n  ✗ pcc (not available)\n' "$mark"
+    exit 1 ;;
+  *) exit 2 ;;
+esac
+STUB
+chmod +x "$AFM_STUB/uname" "$AFM_STUB/fm"
+
+afm_setup() { # afm_setup <home> [VAR=value...]
+  local home=$1; shift
+  mkdir -p "$home"
+  env HOME="$home" PATH="$AFM_STUB:$PATH" "$@" "$REPO/setup.sh" skill </dev/null >/dev/null 2>&1
+}
+
+AFM_HOME="$SANDBOX/afm-home"
+afm_setup "$AFM_HOME"
+assert "supported Mac installs apple-fm" test -f "$AFM_HOME/.agents/skills/apple-fm/SKILL.md"
+assert "installed afm CLI is executable" test -x "$AFM_HOME/.agents/skills/apple-fm/scripts/afm"
+assert "installed afm symlink still resolves" test -f "$AFM_HOME/.agents/skills/apple-fm/scripts/afm"
+assert "optional skills use their own manifest" grep -q '^apple-fm ' "$AFM_HOME/.agents/skills/.dotfiles-manifest-optional"
+
+"$REPO/skills-sync.sh" install "$REPO/.agents/skills" "$AFM_HOME/.agents/skills" >/dev/null
+assert "regular skill sync does not prune apple-fm" test -f "$AFM_HOME/.agents/skills/apple-fm/SKILL.md"
+afm_setup "$AFM_HOME"
+assert "optional skill sync does not prune regular skills" test -f "$AFM_HOME/.agents/skills/verify/SKILL.md"
+
+afm_setup "$AFM_HOME" STUB_FM_MODEL=unavailable
+assert "model no longer ready removes apple-fm" test ! -d "$AFM_HOME/.agents/skills/apple-fm"
+assert "removing apple-fm keeps regular skills" test -f "$AFM_HOME/.agents/skills/verify/SKILL.md"
+
+afm_setup "$SANDBOX/afm-linux" STUB_UNAME_S=Linux STUB_UNAME_M=x86_64
+assert "Linux skips apple-fm" test ! -d "$SANDBOX/afm-linux/.agents/skills/apple-fm"
+
+afm_setup "$SANDBOX/afm-intel" STUB_UNAME_M=x86_64
+assert "Intel Mac skips apple-fm" test ! -d "$SANDBOX/afm-intel/.agents/skills/apple-fm"
+
+afm_setup "$SANDBOX/afm-nolicense" STUB_FM_LICENSE=pending
+assert "unagreed license without a terminal skips apple-fm" test ! -d "$SANDBOX/afm-nolicense/.agents/skills/apple-fm"
+
+mkdir -p "$SANDBOX/afm-edited"
+afm_setup "$SANDBOX/afm-edited"
+printf 'local tweak\n' >> "$SANDBOX/afm-edited/.agents/skills/apple-fm/SKILL.md"
+afm_setup "$SANDBOX/afm-edited"
+assert "locally modified apple-fm is kept" grep -q 'local tweak' "$SANDBOX/afm-edited/.agents/skills/apple-fm/SKILL.md"
+afm_setup "$SANDBOX/afm-edited" FORCE=1
+assert "FORCE=1 overwrites modified apple-fm" bash -c "! grep -q 'local tweak' '$SANDBOX/afm-edited/.agents/skills/apple-fm/SKILL.md'"
+
+echo "apple-fm CLI (python unittest)"
+if command -v python3 >/dev/null 2>&1; then
+  assert "afm CLI test suite" python3 -m unittest discover -s "$REPO/tests/apple-fm"
+  assert "tests leave no bytecode in the skill dir" bash -c "! find '$REPO/.agents/skills-optional' -name __pycache__ | grep -q ."
+else
+  echo "  (skipped: python3 not found)"
+fi
 
 # ---------- make update / uninstall end-to-end ----------
 # make is not part of a stock Windows install; the setup.ps1 suite below covers
@@ -164,7 +246,13 @@ printf 'mine\n' > "$FAKE_HOME/.claude/skills/my-own-skill/SKILL.md"
 # Simulate an install made before shared skills moved from ~/.claude to ~/.agents.
 "$REPO/skills-sync.sh" install "$REPO/.agents/skills" "$FAKE_HOME/.claude/skills" >/dev/null
 
-HOME="$FAKE_HOME" make -C "$REPO" update >/dev/null
+# The apple-fm stubs present a supported Mac, so the optional skill is covered
+# here regardless of the machine running the suite.
+export PATH="$AFM_STUB:$PATH"
+HOME="$FAKE_HOME" make -C "$REPO" update </dev/null >/dev/null
+assert "update installs the optional apple-fm skill" test -f "$FAKE_HOME/.agents/skills/apple-fm/SKILL.md"
+assert "update links apple-fm into Claude" test -L "$FAKE_HOME/.claude/skills/apple-fm"
+assert "update links apple-fm into Codex" test -L "$FAKE_HOME/.codex/skills/apple-fm"
 assert "update installs shared repo skills" test -f "$FAKE_HOME/.agents/skills/skill-authoring/SKILL.md"
 assert "update links skills into Claude" test -L "$FAKE_HOME/.claude/skills/skill-authoring"
 assert "update links skills into Codex" test -L "$FAKE_HOME/.codex/skills/skill-authoring"
@@ -190,6 +278,9 @@ printf '# herdr skill
 ' > "$FAKE_HOME/.agents/skills/herdr/SKILL.md"
 HOME="$FAKE_HOME" make -C "$REPO" uninstall >/dev/null 2>&1
 assert "uninstall removes the generated herdr skill" test ! -d "$FAKE_HOME/.agents/skills/herdr"
+assert "uninstall removes the optional apple-fm skill" test ! -d "$FAKE_HOME/.agents/skills/apple-fm"
+assert "uninstall removes the apple-fm Claude link" test ! -L "$FAKE_HOME/.claude/skills/apple-fm"
+assert "uninstall removes the optional manifest" test ! -f "$FAKE_HOME/.agents/skills/.dotfiles-manifest-optional"
 assert "uninstall removes shared repo skills" test ! -d "$FAKE_HOME/.agents/skills/skill-authoring"
 assert "uninstall removes Codex skill links" test ! -L "$FAKE_HOME/.codex/skills/skill-authoring"
 assert "uninstall removes Codex config" test ! -f "$FAKE_HOME/.codex/config.toml"

@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "title": "Brainstorm",
+  "properties": {
+    "ideas": {"type": "array", "items": {"type": "string"}}
+  },
+  "required": ["ideas"],
+  "additionalProperties": false
+}

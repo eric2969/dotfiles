@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "title": "Critique",
+  "properties": {
+    "concerns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "title": "Concern",
+        "properties": {
+          "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+          "category": {
+            "type": "string",
+            "enum": ["assumption", "edge_case", "ambiguity", "missing_constraint", "unnecessary_complexity"]
+          },
+          "description": {"type": "string"}
+        },
+        "required": ["severity", "category", "description"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["concerns"],
+  "additionalProperties": false
+}

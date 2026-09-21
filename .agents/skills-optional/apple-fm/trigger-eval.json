@@ -1,0 +1,20 @@
+[
+  {"query": "issue 412 的討論串超長，我要開始實作了，幫我整理出需求、限制跟還沒決定的事", "should_trigger": true},
+  {"query": "there's a 600 line service log at /var/log/app/worker.log from this morning, something went wrong but i don't know what to look for. what happened?", "should_trigger": true},
+  {"query": "用本機的 Apple Foundation Models 幫我摘要一下 docs/design-notes.md，我不想花太多 token", "should_trigger": true},
+  {"query": "i've got about 40 error lines from CI in errors.txt, can you sort them into compiler / test / network / config", "should_trigger": true},
+  {"query": "can you use afm to get a quick second opinion on the migration plan in plan.md before i send it to the team", "should_trigger": true},
+  {"query": "git diff main is huge on this branch, give me the gist of which modules changed before we dig in", "should_trigger": true},
+  {"query": "幫我想幾個 CLI flag 的名字，用 on-device model 就好不用太認真", "should_trigger": true},
+  {"query": "the PR thread on #88 has like 70 comments, what did reviewers actually ask for?", "should_trigger": true},
+  {"query": "npm test failed, which tests broke? output is in test-output.txt", "should_trigger": false},
+  {"query": "列出 app.log 裡所有的 ERROR 行，要有時間戳", "should_trigger": false},
+  {"query": "這個 stack trace 是什麼意思？（20 行貼在下面）", "should_trigger": false},
+  {"query": "review src/auth/session.ts for security problems", "should_trigger": false},
+  {"query": "why is this function returning undefined? here's the code", "should_trigger": false},
+  {"query": "write a Swift app that calls the FoundationModels framework to summarize notes", "should_trigger": false},
+  {"query": "should we use Postgres or DynamoDB for the audit log? summarize the tradeoffs", "should_trigger": false},
+  {"query": "幫我 commit 這些變更", "should_trigger": false},
+  {"query": "summarize what you just read in that config file", "should_trigger": false},
+  {"query": "refactor the retry helper to use exponential backoff", "should_trigger": false}
+]

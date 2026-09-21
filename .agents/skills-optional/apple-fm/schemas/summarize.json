@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "title": "Summary",
+  "properties": {
+    "summary": {"type": "string", "description": "One or two sentences."},
+    "key_points": {"type": "array", "items": {"type": "string"}}
+  },
+  "required": ["summary", "key_points"],
+  "additionalProperties": false
+}

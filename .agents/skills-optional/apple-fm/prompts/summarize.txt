@@ -1,0 +1,1 @@
+Condense the text for an engineer who has not read it. Keep only information needed to act: failures, causes, decisions, open items. Copy identifiers, file paths, line numbers, versions and error messages exactly as written. Skip progress output and repetition. Do not add causes or conclusions the text does not state. At most eight key points.

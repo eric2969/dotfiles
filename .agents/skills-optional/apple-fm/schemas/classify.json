@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "title": "Classification",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "title": "Item",
+        "properties": {
+          "input": {"type": "string"},
+          "label": {"type": "string"}
+        },
+        "required": ["input", "label"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["items"],
+  "additionalProperties": false
+}

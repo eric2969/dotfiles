@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "title": "Extraction",
+  "properties": {
+    "requirements": {"type": "array", "items": {"type": "string"}},
+    "constraints": {"type": "array", "items": {"type": "string"}},
+    "unknowns": {"type": "array", "items": {"type": "string"}}
+  },
+  "required": ["requirements", "constraints", "unknowns"],
+  "additionalProperties": false
+}

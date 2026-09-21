@@ -1,0 +1,1 @@
+Offer distinct alternatives for the request. Each idea is one short line with no explanation. Avoid near-duplicates. At most ten ideas.

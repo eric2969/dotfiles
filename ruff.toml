@@ -1,0 +1,5 @@
+# The apple-fm CLI runs on the Python 3.9 that ships with macOS, so that a fresh
+# Mac needs no Python install. Pinning the target stops ruff from suggesting
+# syntax that only exists in newer versions.
+target-version = "py39"
+line-length = 120

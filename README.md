@@ -31,6 +31,7 @@ make install
 | `~/.claude/skills/*`, `~/.codex/skills/*` | Symlinks to the shared copies in `~/.agents/skills`; unrelated and system skills are kept |
 | `Documents/WindowsPowerShell/Microsoft.PowerShell_profile.ps1` | Symlink to the pwsh 7 profile so Windows PowerShell 5.1 shares it; a profile you wrote yourself is kept (use `-Force` to replace it with the link) |
 | `~/.agents/skills/herdr` | Generated from the installed binary (`herdr --skill`) on every update/upgrade, so it always matches the herdr release; removed on uninstall |
+| `~/.agents/skills/apple-fm` | Optional, from `.agents/skills-optional`: installed only on an Apple silicon Mac where the `fm` CLI exists, its Legal Notice & Terms are agreed to, and `fm models` reports the on-device model ready. If the terms are not agreed yet, `make update` runs `fm license` so you can read and answer them in the terminal; a non-interactive run skips the skill instead. It is removed again when any check stops passing. Same manifest policy as other skills, tracked separately in `.dotfiles-manifest-optional` |
 
 To skip OS package installation, run the bootstrap directly: `./setup.sh -n`.
 
@@ -82,7 +83,7 @@ prompts do not look the same.
 
 ## What's inside
 
-- `setup.sh` — Unix bootstrapper: OS packages, Sauce Code Pro Nerd Font, zinit, vim-plug, Claude Code, Codex CLI, herdr, uv, nvm, default shell (`./setup.sh skill` regenerates the herdr agent skill on its own)
+- `setup.sh` — Unix bootstrapper: OS packages, Sauce Code Pro Nerd Font, zinit, vim-plug, Claude Code, Codex CLI, herdr, uv, nvm, default shell (`./setup.sh skill` regenerates the herdr agent skill and installs or removes the machine-dependent `apple-fm` skill)
 - `rcblock.sh` — manages the marked dotfiles block inside `~/.zshrc` / `~/.bash_profile`
 - `skills-sync.sh` — manifest-based sync of shared skills into `~/.agents/skills`, plus single-file mode (`install-file` / `remove-file`) used for `~/.claude/CLAUDE.md`
 - `skill-links.sh` — links shared skills into both `~/.claude/skills` and `~/.codex/skills`
@@ -96,6 +97,8 @@ prompts do not look the same.
 - `.vimrc` — vim-plug plugins
 - `.tmux.conf` — tmux config
 - `.agents/skills/` — shared skills used by Claude Code and Codex
+- `.agents/skills-optional/` — skills that only work on some machines; `setup.sh` decides per machine. Currently `apple-fm`, which delegates small text tasks to the on-device Apple Foundation Model through the `fm` CLI (never installed on Linux, Windows or Intel Macs)
+- `tests/apple-fm/` — Python unit tests for the `apple-fm` CLI, run by `tests/test.sh` against a fake `fm`
 - `.claude/` — Claude Code-specific settings and CLAUDE.md
 - `.codex/config.toml` — Codex CLI settings, including the TUI status line
 

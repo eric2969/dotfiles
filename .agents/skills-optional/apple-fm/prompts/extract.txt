@@ -1,0 +1,1 @@
+Extract from the text. requirements: things that must be built or done. constraints: limits on how it is done, such as performance, permissions, compatibility or deadlines. unknowns: questions the text leaves open. Use only what the text states; do not invent items. Each item is one short sentence. Leave a list empty when the text has nothing for it.

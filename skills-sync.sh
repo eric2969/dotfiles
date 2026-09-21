@@ -5,7 +5,10 @@
 # older repo version" (updated) — same philosophy as rcblock.sh for rc files.
 set -euo pipefail
 
-MANIFEST_NAME='.dotfiles-manifest'
+# Pruning treats every manifest entry missing from <repo skills dir> as dropped
+# from the repo. Skill sets installed from different source dirs into the same
+# target therefore need their own manifest, selected with SKILLS_MANIFEST_NAME.
+MANIFEST_NAME=${SKILLS_MANIFEST_NAME:-.dotfiles-manifest}
 
 sha() {
   if command -v shasum >/dev/null 2>&1; then shasum -a 256; else sha256sum; fi
