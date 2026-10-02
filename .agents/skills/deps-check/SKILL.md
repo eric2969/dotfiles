@@ -1,38 +1,26 @@
 ---
 name: deps-check
 description: >-
-  Audit dependencies for vulnerabilities and freshness whenever dependency manifests
-  change or the user asks about package security. Trigger on edits to package.json,
-  package-lock.json, go.mod, requirements.txt, pyproject.toml, or when the user
-  mentions CVEs, security advisories, npm audit, outdated packages, or upgrading a
-  dependency. Keywords: "any security issues?", "check for CVEs", "npm audit",
-  "有沒有漏洞", "套件多久沒更新", "should we update our deps".
+  Audit dependencies for known vulnerabilities and risky upgrades. Use when a dependency
+  manifest changes (package.json, lockfiles, go.mod, requirements.txt, pyproject.toml)
+  and when asked about CVEs, security advisories, outdated packages, or upgrading a
+  dependency.
 ---
 
 # Dependency Check
 
-> ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/deps-check/SKILL.md`.
-> Update it there and sync with `make update` (macOS/Linux) or `.\setup.ps1 -Action update` (Windows).
-> Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
+## Steps
 
-**Purpose:** Keep dependency changes safe by auditing for known vulnerabilities and
-flagging risky upgrades.
+1. **Run the ecosystem's audit:** `npm audit` / `pnpm audit` / `yarn audit`,
+   `govulncheck ./...`, or `pip-audit`.
+2. **High or critical findings in a direct dependency:** apply the recommended upgrade
+   or replacement and re-run until none remain. If one cannot be fixed, report why.
+3. **Moderate or low findings, and vulnerable transitive dependencies:** report them
+   with the available remediation. Do not force a major-version bump for these.
+4. **Major-version upgrades:** read the changelog or release notes and summarize the
+   breaking changes that affect this codebase.
+5. **After any dependency change:** run the project's install command, then the
+   `verify` skill's full run, to confirm the lockfile is consistent and nothing broke.
 
-**Actions:**
-
-1. Detect the ecosystem's audit command: `npm audit` / `pnpm audit` / `yarn audit`
-   for Node, `govulncheck ./...` for Go, `pip-audit` for Python, or `<audit-command>`.
-2. 🔴 Run the audit. For each high/critical finding that affects a direct dependency,
-   apply the recommended fix (upgrade or replacement) and re-run until no high/critical
-   findings remain in direct dependencies, or report why a fix is not possible.
-3. 🟡 Report moderate/low findings and vulnerable transitive dependencies with the
-   available remediation, but do not force major-version bumps for them.
-4. 🟡 When the user upgrades across a major version, check the package's changelog or
-   release notes for breaking changes and summarize the ones that affect this codebase.
-5. 🔴 After any dependency change, run the project's install command
-   (`<install-command>`) and then the `verify` skill (lint + type check + tests) to
-   confirm the lockfile is consistent and nothing breaks.
-
-**Pass criteria:** The audit command reports no high/critical vulnerabilities in direct
-dependencies (or each remaining one has a documented reason), and install + tests exit 0
-after the change.
+**Done when** the audit reports no high or critical vulnerability in a direct
+dependency (or each remaining one has a stated reason), and install and `verify` pass.

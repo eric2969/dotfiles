@@ -1,45 +1,33 @@
 ---
 name: refactor
 description: >-
-  Test-driven refactoring workflow for restructuring existing code without changing
-  behavior. Trigger whenever the user asks to refactor, restructure, clean up, or
-  simplify existing code, or mentions code smells like duplication, long functions,
-  or deep nesting. Keywords: "refactor", "重構", "整理這段程式碼", "clean up this code",
-  "拆成小函式", "too complex", "simplify this module".
+  Behavior-preserving refactoring workflow: tests first, one code smell at a time. Use
+  when asked to refactor, restructure, clean up, or simplify existing code, or to fix
+  duplication, long functions, or deep nesting.
 ---
 
 # Refactor
 
-> ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/refactor/SKILL.md`.
-> Update it there and sync with `make update` (macOS/Linux) or `.\setup.ps1 -Action update` (Windows).
-> Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
+A refactor changes structure and nothing else. Tests are what prove that, so they come
+first, and the scope stays narrow enough to review.
 
-**Purpose:** Keep refactoring safe and scoped — behavior-preserving changes backed by
-tests, one code smell at a time.
+## Steps
 
-## When to refactor (code smells)
+1. **Baseline tests.** Before touching the code, make sure tests cover the target's
+   current behavior and edge cases. Where they are missing, write them and see them
+   pass. Do not refactor code that has no tests.
+2. **Small steps.** One transformation at a time (extract function, introduce parameter
+   object, replace magic number, …), running the tests after each. Never continue on a
+   red test.
+3. **Behavior stays the same.** If a behavior change turns out to be needed, stop and
+   raise it as a separate task.
+4. **One smell per session.** Report other problems you notice instead of fixing them
+   on the way through. Stop when the smell is resolved; do not gold-plate.
+5. **Finish** with the `verify` skill's full run, and use a `refactor:` commit type.
 
-Duplicated code · function > ~50 lines or doing multiple things · more than 3–4
-parameters · oversized class/struct · nesting deeper than 3 levels · feature envy
-(logic living far from the data it uses).
+Smells worth acting on: duplicated code, a function over about 50 lines or doing
+several things, more than 4 parameters, nesting deeper than 3 levels, an oversized
+type, logic living far from the data it uses.
 
-## Actions
-
-1. 🔴 **Tests first** — before touching the code, ensure the target has tests covering
-   its current behavior and edge cases. If missing, write them and confirm they pass
-   as the baseline. Refactoring without tests is prohibited.
-2. 🔴 **Small steps** — one improvement at a time (extract function, extract interface,
-   introduce parameter object, replace magic number with constant…). Run the tests
-   after each step; never proceed on red.
-3. 🔴 **Behavior preservation** — refactoring must not change observable behavior. If a
-   behavior change is needed, stop and surface it as a separate task.
-4. 🔴 **Scope control** — one code smell per session/PR. Report other problems found
-   along the way instead of fixing them inline ("while I'm here" is scope creep).
-5. 🟡 **Design direction** — favor single responsibility, small focused interfaces, and
-   depending on abstractions; stop when the smell is resolved (YAGNI — don't gold-plate).
-6. 🔴 **Final verification** — run the `verify` skill (lint + type check + full tests)
-   before declaring the refactor done; commit with a `refactor:` type message.
-
-**Pass criteria:** Baseline tests existed (or were written) before the change, all
-tests pass after every step, the diff addresses exactly one code smell, and `verify`
-exits 0 on the final state.
+**Done when** baseline tests existed before the change, they passed after every step,
+the diff addresses one smell, and `verify` passes on the final state.

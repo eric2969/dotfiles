@@ -1,36 +1,27 @@
 ---
 name: docs-sync
 description: >-
-  Check whether documentation needs updating after a functional change is completed.
-  Trigger when a feature, CLI flag, config option, public API, or workflow is added,
-  changed, or removed, or when the user asks whether docs/README are up to date.
-  Keywords: "update the docs", "README 要更新嗎", "文件要同步嗎", "docs still accurate?",
-  "幫我看 README". Applies before finishing any user-facing change.
+  Keep documentation truthful after a user-facing change. Use before finishing any
+  change that adds, changes, or removes a feature, command, flag, config option, public
+  API, or workflow, and when asked whether the README or docs are up to date.
 ---
 
 # Docs Sync
 
-> ⚠️ This skill is version-controlled in the dotfiles repo at `.claude/skills/docs-sync/SKILL.md`.
-> Update it there and sync with `make update` (macOS/Linux) or `.\setup.ps1 -Action update` (Windows).
-> Sync auto-updates unmodified copies; locally modified copies are kept unless `FORCE=1` / `-Force`.
+A user-facing change lands together with the doc updates it makes necessary.
 
-**Purpose:** Keep documentation truthful — every user-facing change lands together
-with the doc updates it invalidates.
+## Steps
 
-## Actions
+1. **Find the docs that describe the changed surface:** `README.md`, `docs/`,
+   `CLAUDE.md` indexes and tables, `--help` text, doc comments, example snippets.
+2. **Fix what the change made false:** renamed or removed commands, flags, targets,
+   paths, defaults, or workflows still described the old way.
+3. **Document new surface** to the level its siblings have. A new Makefile target, for
+   example, appears everywhere the other targets are listed.
+4. **Check the examples.** Run documented commands that are cheap to run, and flag any
+   that can no longer work as written.
 
-1. Identify the docs that describe the changed surface: `README.md`, `docs/`,
-   `CLAUDE.md` (indexes/tables), command `--help` text, code-level doc comments,
-   and example snippets.
-2. 🔴 Fix statements the change made false — renamed/removed commands, flags, targets,
-   file paths, defaults, or workflows that docs still describe the old way.
-3. 🔴 Document new user-facing surface: a new command/flag/target/config option gets
-   at least the same level of documentation its siblings have (e.g. a new Makefile
-   target appears wherever the other targets are listed).
-4. 🟡 Verify examples still work: run documented commands that are cheap to run, or
-   flag ones that can no longer work as written.
-5. 🟡 Report (do not fix) documentation debt unrelated to the current change.
+Doc problems unrelated to the current change: report them, do not fix them here.
 
-**Pass criteria:** No document in the repo describes the changed surface incorrectly,
-new surface is documented where siblings are, and unrelated doc debt is reported
-rather than silently expanded.
+**Done when** no document describes the changed surface incorrectly and new surface is
+documented where its siblings are.
