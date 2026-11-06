@@ -70,6 +70,53 @@ install_deps() {
     fi
 }
 
+# Installed apart from install_deps so a distro without the package (older
+# Debian/Ubuntu) only loses gh, instead of failing the whole dependency step.
+install_gh() {
+    if command -v gh >/dev/null 2>&1; then
+        echo "GitHub CLI (gh) already installed."
+        return 0
+    fi
+    info "Installing GitHub CLI (gh)..."
+    local status=0
+    if command -v brew >/dev/null 2>&1; then
+        brew install gh || status=$?
+    elif command -v apt-get >/dev/null 2>&1; then
+        # install_deps skips apt-get update when its tools are present, so
+        # refresh the lists here or a fresh machine cannot find the package.
+        { sudo apt-get update && sudo apt-get install -y gh; } || status=$?
+    elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y gh || status=$?
+    elif command -v pacman >/dev/null 2>&1; then
+        # Arch packages it as github-cli, not gh.
+        sudo pacman -S --needed --noconfirm github-cli || status=$?
+    else
+        status=1
+    fi
+    if [ "$status" -ne 0 ]; then
+        warn "GitHub CLI install failed (exit $status); see https://github.com/cli/cli#installation"
+    fi
+}
+
+upgrade_gh() {
+    if ! command -v gh >/dev/null 2>&1; then
+        return 0
+    fi
+    info "Upgrading GitHub CLI (gh)..."
+    local status=0
+    if command -v brew >/dev/null 2>&1; then
+        brew upgrade gh || status=$?
+    elif command -v apt-get >/dev/null 2>&1; then
+        sudo apt-get install --only-upgrade -y gh || status=$?
+    elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf upgrade -y gh || status=$?
+    fi
+    # pacman: upgrade_deps already ran a full -Syu, which covers github-cli.
+    if [ "$status" -ne 0 ]; then
+        warn "GitHub CLI upgrade failed (exit $status)"
+    fi
+}
+
 install_font() {
     info "Installing Sauce Code Pro Nerd Font..."
     if command -v brew >/dev/null 2>&1; then
@@ -411,6 +458,7 @@ main() {
     fi
     if [ "${1:-}" = "upgrade" ]; then
         upgrade_deps || warn "OS package upgrade encountered errors"
+        upgrade_gh
         upgrade_tools
         upgrade_zinit
         ok "Upgrade finished. Run 'make update' if configs changed, then restart your terminal."
@@ -425,6 +473,7 @@ main() {
         warn "Skipping dependency installation (-n)"
     else
         install_deps
+        install_gh
     fi
     install_font
     install_zinit

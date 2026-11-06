@@ -2,9 +2,9 @@
 .SYNOPSIS
     Windows installer for these dotfiles.
 .DESCRIPTION
-    install   - install dependencies (git, vim, choco, claude, codex, herdr, uv, nvm + Node LTS), Nerd Font, vim-plug, then copy configs
+    install   - install dependencies (git, gh, vim, choco, claude, codex, herdr, uv, nvm + Node LTS), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
-    upgrade   - upgrade installed packages and tools (winget, choco, claude, codex, herdr, uv, PowerShell modules for 7 and 5.1, vim plugins)
+    upgrade   - upgrade installed packages and tools (winget incl. gh, choco, claude, codex, herdr, uv, PowerShell modules for 7 and 5.1, vim plugins)
     reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
     doctor    - report why the PowerShell prompt is not showing up (read-only)
@@ -256,6 +256,9 @@ function Install-Dependencies {
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install vim.vim exited with code $LASTEXITCODE" }
     winget install --id JanDeDobbeleer.OhMyPosh -e --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) { Write-Warning "winget install JanDeDobbeleer.OhMyPosh exited with code $LASTEXITCODE" }
+    # winget, not Chocolatey: gh needs no admin this way and does not depend on choco's lock files.
+    winget install --id GitHub.cli -e --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) { Write-Warning "winget install GitHub.cli exited with code $LASTEXITCODE" }
     Update-SessionPath
 }
 
@@ -951,6 +954,9 @@ function Invoke-Upgrade {
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade vim.vim exited with code $LASTEXITCODE" }
         winget upgrade --id JanDeDobbeleer.OhMyPosh -e --accept-source-agreements --accept-package-agreements
         if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade JanDeDobbeleer.OhMyPosh exited with code $LASTEXITCODE" }
+        # winget, not Chocolatey: gh needs no admin this way and does not depend on choco's lock files.
+        winget upgrade --id GitHub.cli -e --accept-source-agreements --accept-package-agreements
+        if ($LASTEXITCODE -ne 0) { Write-Warning "winget upgrade GitHub.cli exited with code $LASTEXITCODE" }
     } else {
         Write-Warning 'winget not found, skipping winget upgrades.'
     }
