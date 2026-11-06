@@ -14,6 +14,10 @@
 
     'install' and 'reinstall' need an elevated shell (Chocolatey and nvm-windows
     install machine-wide). The other actions run fine as a normal user.
+
+    'install', 'reinstall' and 'upgrade' first run preflight checks (elevation,
+    winget, a runnable and writable Chocolatey, no concurrent choco run, stale
+    lock files) and stop before changing anything when one fails.
 #>
 param(
     [ValidateSet('install', 'update', 'upgrade', 'reinstall', 'uninstall', 'doctor')]
@@ -55,6 +59,185 @@ function Update-SessionPath {
         }
     }
     $env:PATH = $dirs -join ';'
+}
+
+# ---------- Preflight ----------
+# Everything below runs before the first change to the machine, so a broken
+# Chocolatey install or a missing elevation stops the run instead of half
+# applying it. Nothing here ever touches ACLs: an icacls fix applied blindly
+# (for example /inheritance:r with /T) is what makes choco.exe itself
+# unrunnable, so permission damage is only reported, never "repaired".
+
+function Get-ChocoRoot {
+    if ($env:ChocolateyInstall) { return $env:ChocolateyInstall }
+    Join-Path $env:ProgramData 'chocolatey'
+}
+
+# Leftovers of an interrupted choco/NuGet run: 40-hex lock files directly in
+# lib\, plus the lib-bad / lib-bkp folders. Either one makes the next
+# "choco install" fail with "Unable to obtain lock file access".
+function Get-ChocoLeftovers([string]$Root = (Get-ChocoRoot)) {
+    $lib = Join-Path $Root 'lib'
+    $items = @()
+    if (Test-Path $lib) {
+        $items += @(Get-ChildItem $lib -File -Force -ErrorAction Stop |
+                    Where-Object { $_.Name -match '^[0-9a-fA-F]{40}$' })
+    }
+    foreach ($name in 'lib-bad', 'lib-bkp') {
+        $dir = Join-Path $Root $name
+        if (Test-Path $dir) { $items += Get-Item $dir -Force }
+    }
+    $items
+}
+
+# Removes the leftovers; returns the paths that could not be removed.
+function Clear-ChocoLeftovers([string]$Root = (Get-ChocoRoot)) {
+    $failed = @()
+    foreach ($item in @(Get-ChocoLeftovers $Root)) {
+        try {
+            Remove-Item $item.FullName -Recurse -Force -ErrorAction Stop
+            Write-Host "  removed stale Chocolatey leftover: $($item.FullName)"
+        } catch {
+            Write-Warning "Could not remove $($item.FullName): $_"
+            $failed += $item.FullName
+        }
+    }
+    $failed
+}
+
+# choco being on PATH is not enough: with broken ACLs the file is there but
+# Windows refuses to execute it ("存取被拒" / "Access is denied").
+function Test-ChocoUsable {
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) { return $false }
+    try {
+        choco --version *> $null
+        return $LASTEXITCODE -eq 0
+    } catch {
+        return $false
+    }
+}
+
+# Write probe: the only reliable way to know the current token may create
+# files in a directory, whatever the ACL says on paper.
+function Test-DirWritable([string]$Dir) {
+    $probe = Join-Path $Dir ".dotfiles-preflight-$([guid]::NewGuid().ToString('n'))"
+    try {
+        New-Item -ItemType File -Path $probe -ErrorAction Stop | Out-Null
+        Remove-Item $probe -Force -ErrorAction Stop
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Test-ControlledFolderAccess {
+    try {
+        return (Get-MpPreference -ErrorAction Stop).EnableControlledFolderAccess -eq 1
+    } catch {
+        # Defender cmdlets are absent or blocked (third-party AV): nothing to report.
+        return $false
+    }
+}
+
+# Checks whether $Action can run safely and configures this process for it.
+# Returns the checks; any with Blocking = $true and Ok = $false must stop the run.
+function Invoke-Preflight([string]$Action, [string]$ChocoRoot = (Get-ChocoRoot)) {
+    $needsAdmin = $Action -in 'install', 'reinstall'
+    $usesChoco = $needsAdmin -or ($Action -eq 'upgrade' -and (Test-Elevated))
+    $elevated = Test-Elevated
+    $checks = @()
+
+    $checks += [pscustomobject]@{
+        Ok       = $elevated -or -not $needsAdmin
+        Blocking = $true
+        Message  = if ($needsAdmin) { "'$Action' runs as Administrator" } else { "'$Action' needs no Administrator rights (elevated: $elevated)" }
+        Fix      = 'right-click PowerShell -> "Run as administrator", or use: .\setup.ps1 -Action update (configs only, no admin)'
+    }
+
+    if ($needsAdmin -and -not $SkipDeps) {
+        $checks += [pscustomobject]@{
+            Ok       = [bool](Get-Command winget -ErrorAction SilentlyContinue)
+            Blocking = $true
+            Message  = 'winget available'
+            Fix      = 'install "App Installer" from the Microsoft Store, or re-run with -SkipDeps'
+        }
+    }
+
+    if ($usesChoco) {
+        $running = @(Get-Process choco -ErrorAction SilentlyContinue)
+        $checks += [pscustomobject]@{
+            Ok       = $running.Count -eq 0
+            Blocking = $true
+            Message  = 'no other Chocolatey process running'
+            Fix      = 'wait for the other choco run to finish (do not Ctrl+C it), then re-run'
+        }
+
+        if (Test-Path $ChocoRoot) {
+            $usable = Test-ChocoUsable
+            $checks += [pscustomobject]@{
+                Ok       = $usable
+                Blocking = $true
+                Message  = "existing Chocolatey at $ChocoRoot runs (choco --version)"
+                Fix      = 'choco.exe is missing from PATH or cannot execute (broken ACLs); see README "Chocolatey fails with access denied"'
+            }
+            $checks += [pscustomobject]@{
+                Ok       = Test-DirWritable $ChocoRoot
+                Blocking = $true
+                Message  = "$ChocoRoot is writable by this shell"
+                Fix      = 'take ownership back as Administrators; see README "Chocolatey fails with access denied"'
+            }
+            # Only clean up when nothing else holds the locks and the shell can write.
+            $failed = @()
+            if ($running.Count -eq 0 -and $elevated) {
+                $failed = @(Clear-ChocoLeftovers $ChocoRoot)
+            }
+            $left = @(Get-ChocoLeftovers $ChocoRoot)
+            $checks += [pscustomobject]@{
+                Ok       = $left.Count -eq 0
+                Blocking = $true
+                Message  = 'no stale Chocolatey lock files or lib-bad / lib-bkp folders'
+                Fix      = "remove by hand from an elevated shell: $(($failed + @($left | ForEach-Object FullName) | Select-Object -Unique) -join ', ')"
+            }
+        }
+
+        $checks += [pscustomobject]@{
+            Ok       = -not (Test-ControlledFolderAccess)
+            Blocking = $false
+            Message  = 'Windows Controlled Folder Access is off'
+            Fix      = "it may block writes to $ChocoRoot; allow powershell/choco in Windows Security if an install fails"
+        }
+    }
+
+    # Process-scoped only: lets the remote installer scripts run and makes the
+    # downloads use TLS 1.2, without changing anything persistent.
+    if ($needsAdmin -or $Action -eq 'upgrade') {
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    }
+
+    $checks
+}
+
+# Prints the preflight report and throws when a blocking check failed, before
+# any change has been made.
+function Assert-Preflight([string]$Action) {
+    Write-Host "Preflight checks for '$Action'" -ForegroundColor Yellow
+    $checks = @(Invoke-Preflight $Action)
+    foreach ($check in $checks) {
+        if ($check.Ok) {
+            Write-Host "  ok    $($check.Message)"
+        } elseif ($check.Blocking) {
+            Write-Host "  STOP  $($check.Message)" -ForegroundColor Red
+            Write-Host "        -> $($check.Fix)"
+        } else {
+            Write-Host "  WARN  $($check.Message)" -ForegroundColor Yellow
+            Write-Host "        -> $($check.Fix)"
+        }
+    }
+    $blockers = @($checks | Where-Object { $_.Blocking -and -not $_.Ok })
+    if ($blockers.Count -gt 0) {
+        throw "Preflight failed ($($blockers.Count) blocking problem(s)); nothing was changed. Fix the STOP lines above and re-run."
+    }
 }
 
 function Install-Dependencies {
@@ -145,6 +328,12 @@ function Install-Choco {
         Write-Host 'Chocolatey already installed.'
         return
     }
+    # A leftover folder without a working choco means a broken install; running
+    # the installer over it would fail on the same ACLs. Preflight reports it.
+    if (Test-Path (Get-ChocoRoot)) {
+        Write-Warning "$(Get-ChocoRoot) exists but choco is not on PATH, skipping. See README 'Chocolatey fails with access denied'."
+        return
+    }
     if (-not (Test-Elevated)) {
         Write-Warning 'Chocolatey needs an elevated shell, skipping. Re-run setup.ps1 as Administrator to install it.'
         return
@@ -179,7 +368,7 @@ function Install-Nvm {
         Write-Host 'nvm already installed.'
         return
     }
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+    if (-not (Test-ChocoUsable)) {
         Write-Warning 'Chocolatey not available, skipping nvm-windows.'
         return
     }
@@ -765,7 +954,7 @@ function Invoke-Upgrade {
     } else {
         Write-Warning 'winget not found, skipping winget upgrades.'
     }
-    if (Get-Command choco -ErrorAction SilentlyContinue) {
+    if (Test-ChocoUsable) {
         if (Test-Elevated) {
             Write-Host 'Upgrading Chocolatey packages...' -ForegroundColor Yellow
             choco upgrade nvm -y
@@ -810,6 +999,8 @@ function Invoke-Upgrade {
 }
 
 function Invoke-Install {
+    # Assert-Preflight already stops an unelevated run at the entry point; this
+    # second guard covers callers that dot-source the script and call this directly.
     if (-not (Test-Elevated)) {
         throw 'Run install from an elevated PowerShell (Chocolatey, nvm-windows and Developer Mode need admin). Use "setup.ps1 -Action update" to copy configs only.'
     }
@@ -836,6 +1027,9 @@ function Invoke-Install {
 # Dot-sourcing loads the functions without running anything, which is how
 # tests/test.ps1 exercises them against a sandbox HOME.
 if ($MyInvocation.InvocationName -ne '.') {
+    # Fail fast: a blocked install must stop before Remove-Configs (reinstall)
+    # or the first package manager call, not halfway through.
+    if ($Action -in 'install', 'reinstall', 'upgrade') { Assert-Preflight $Action }
     switch ($Action) {
         'install'   { Invoke-Install }
         'update'    { Copy-Configs }

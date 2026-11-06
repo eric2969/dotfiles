@@ -165,6 +165,45 @@ try {
         $count -is [int] -and $count -ge 0
     }
 
+    # ---------- Chocolatey leftovers ----------
+    Write-Host 'Get-ChocoLeftovers / Clear-ChocoLeftovers'
+    $chocoRoot = Join-Path $Sandbox 'chocolatey'
+    $lock = Join-Path $chocoRoot ('lib\' + ('a1' * 20))
+    $pkg = Join-Path $chocoRoot 'lib\nvm'
+    New-Item -ItemType Directory -Force -Path $pkg, (Join-Path $chocoRoot 'lib-bad\gh') | Out-Null
+    Set-Content -Path $lock -Value ''
+    Set-Content -Path (Join-Path $pkg 'nvm.nupkg') -Value ''
+    Assert 'finds the lock file and lib-bad' { @(Get-ChocoLeftovers $chocoRoot).Count -eq 2 }
+    Assert 'ignores installed package folders' {
+        -not (@(Get-ChocoLeftovers $chocoRoot) | Where-Object { $_.FullName -eq $pkg })
+    }
+    Assert 'clears every leftover' {
+        $failed = @(Clear-ChocoLeftovers $chocoRoot 6>$null)
+        $failed.Count -eq 0 -and @(Get-ChocoLeftovers $chocoRoot).Count -eq 0
+    }
+    Assert 'keeps installed packages' { Test-Path (Join-Path $pkg 'nvm.nupkg') }
+    Assert 'reports nothing for a missing root' {
+        @(Get-ChocoLeftovers (Join-Path $Sandbox 'no-such-choco')).Count -eq 0
+    }
+
+    # ---------- Invoke-Preflight ----------
+    Write-Host 'Invoke-Preflight'
+    Assert 'update has no blocking problem' {
+        -not @(Invoke-Preflight 'update' $chocoRoot | Where-Object { $_.Blocking -and -not $_.Ok })
+    }
+    Assert 'detects a writable directory' { Test-DirWritable $Sandbox }
+    if (-not (Test-Elevated)) {
+        Assert 'install blocks without Administrator' {
+            [bool](@(Invoke-Preflight 'install' $chocoRoot) |
+                   Where-Object { $_.Blocking -and -not $_.Ok -and $_.Message -match 'Administrator' })
+        }
+        Assert-Throws 'Assert-Preflight stops install before any change' {
+            Assert-Preflight 'install' 6>$null
+        } 'Preflight failed'
+    } else {
+        Write-Host '  skip  non-elevated install guard (shell is elevated)'
+    }
+
     # ---------- Enable-ProfileExecution ----------
     Write-Host 'Enable-ProfileExecution'
     $policyBefore = Get-ExecutionPolicy

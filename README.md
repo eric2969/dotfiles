@@ -77,6 +77,45 @@ exact command for whatever is wrong. The usual causes, in order:
 4. **The Nerd Font is missing or the terminal is not using it.** The prompt loads, but
    every icon renders as an empty box. Set the terminal font to *SauceCodePro Nerd Font*.
 
+### Preflight checks
+
+`install`, `reinstall` and `upgrade` check the machine **before changing anything** and
+stop with a `STOP` line (plus the fix) when one fails — `reinstall` stops before it removes
+your configs:
+
+| Check | Blocks |
+|-------|--------|
+| Shell is elevated (Administrator) | `install`, `reinstall` (`update` / `upgrade` / `uninstall` / `doctor` run as a normal user) |
+| `winget` exists | `install`, `reinstall` unless `-SkipDeps` |
+| No other `choco` process is running | whenever Chocolatey will be used |
+| An existing `C:\ProgramData\chocolatey` really runs (`choco --version`) and is writable | whenever Chocolatey will be used |
+| No stale 40-hex lock files in `lib\`, no `lib-bad` / `lib-bkp` — removed automatically when elevated and no choco is running | whenever Chocolatey will be used |
+| Windows Controlled Folder Access is off | warning only |
+
+The run also sets `ExecutionPolicy Bypass` and TLS 1.2 **for its own process only**.
+It never touches ACLs: permission damage is reported, not "repaired".
+
+### Chocolatey fails with access denied
+
+Symptoms: `Unable to obtain lock file access on '...\lib\<40 hex>'`, `Cannot create directory
+"...\lib-bad"`, or `'choco.exe' 程式無法執行: 存取被拒`. Causes: running choco unelevated, an
+interrupted choco run, or an `icacls ... /inheritance:r ... /T` that stripped every file's ACL.
+In an **elevated** PowerShell:
+
+```powershell
+$choco = 'C:\ProgramData\chocolatey'
+icacls $choco /setowner "*S-1-5-32-544" /T /C /Q   # owner: Administrators
+icacls $choco /grant "*S-1-5-32-544:(OI)(CI)F" /C /Q
+icacls "$choco\*" /reset /T /C /Q                  # children inherit again
+.\setup.ps1 -Action upgrade                         # preflight clears stale locks
+```
+
+If `choco` still cannot run, back up the package list
+(`Get-ChildItem "$choco\lib" -Directory | Select-Object -ExpandProperty Name`), delete
+`$choco`, remove `ChocolateyInstall` and the `chocolatey\bin` PATH entry from the machine
+environment, open a new elevated shell and run `.\setup.ps1` again. Never combine
+`/inheritance:r` with `/T`.
+
 Note the Windows prompt is **oh-my-posh** with the `clean-detailed` theme, not
 powerlevel10k — `.p10k.zsh` is zsh-only and is never installed on Windows, so the two
 prompts do not look the same.
