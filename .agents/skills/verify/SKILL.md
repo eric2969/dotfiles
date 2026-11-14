@@ -13,6 +13,10 @@ loop after each edit stays fast and the full cost is paid once, before the commi
 
 ## Find the commands
 
+If the project has its own `<project>-dev-check` skill, follow that one instead of this
+generic version; it holds the project's exact commands and the convention checks each
+change needs.
+
 Use the first source that defines them:
 
 1. `Makefile` targets. `make lint` / `make test` (or `make check`) are the full run. A

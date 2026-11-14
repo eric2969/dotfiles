@@ -9,6 +9,9 @@ description: >-
 
 # Dependency Check
 
+If the project has its own `<project>-deps-check` skill, follow that one instead of this
+generic version; it knows the project's version pins.
+
 ## Steps
 
 1. **Run the ecosystem's audit:** `npm audit` / `pnpm audit` / `yarn audit`,

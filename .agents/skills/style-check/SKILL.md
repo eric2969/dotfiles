@@ -14,7 +14,7 @@ Covers the project conventions a linter cannot express.
 ## Steps
 
 1. **Find the conventions:** the project's `CLAUDE.md`, a conventions doc, or a
-   project-level `style-check` skill. If the project has its own `style-check` skill,
+   project-level `<project>-style-check` skill. If the project has its own such skill,
    follow that one instead of this generic version.
 2. **Mandatory conventions** for the changed file type (an auth/session check in API
    routes, a required directive such as `'use client'`, code in the prescribed

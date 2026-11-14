@@ -12,6 +12,9 @@ A skill is a briefing for a capable model that has none of your context. Write w
 could not work out on its own: the choices specific to this user or project, the reason
 behind each, and what "done" means. Leave out what any good engineer already does.
 
+If the project has its own `<project>-skill-authoring` skill, follow that one instead of
+this generic version.
+
 ## Shape
 
 ```markdown
@@ -60,7 +63,10 @@ every description is loaded into every session, so each word costs.
   something matters, one sentence of reasoning does more than volume.
 - **Done criteria that can be checked:** "lint and tests exit 0", not "looks good".
 - **Portable.** A shared skill names no project-specific command. Describe how to find
-  the command (Makefile target, package script, language default).
+  the command (Makefile target, package script, language default). Project-specific
+  versions live in the project's `.claude/skills/` as `<project>-<skill>` (for example
+  `<project>-dev-check`), and the shared skill points to that name so the two never
+  compete.
 - **Lean.** Keep SKILL.md to the rules that always apply, well under 100 lines. Long
   material (pattern catalogs, code examples) goes in `references/*.md` next to it,
   listed with a line on when to read each (`go-dev` shows the layout).
