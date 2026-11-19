@@ -4,7 +4,7 @@
 .DESCRIPTION
     install   - install dependencies (git, gh, vim, choco, claude, codex, herdr, uv, nvm + Node LTS), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
-    upgrade   - upgrade installed packages and tools (winget incl. gh, choco, claude, codex, herdr, uv, PowerShell modules for 7 and 5.1, vim plugins); claude, uv, nvm and codex are installed when missing
+    upgrade   - upgrade installed packages and tools (winget incl. gh, choco, claude, codex, herdr, uv, PowerShell modules for 7 and 5.1, vim plugins); claude, uv, nvm, codex and herdr are installed when missing
     reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
     doctor    - report why the PowerShell prompt is not showing up (read-only)
@@ -1027,8 +1027,10 @@ function Invoke-Upgrade {
         Write-Host 'Updating herdr...' -ForegroundColor Yellow
         herdr update
         if ($LASTEXITCODE -ne 0) { Write-Warning "herdr update exited with code $LASTEXITCODE" }
-        Install-HerdrSkill
+    } else {
+        Install-Herdr
     }
+    Install-HerdrSkill
     Write-Host 'Updating PowerShell modules...' -ForegroundColor Yellow
     foreach ($module in 'posh-git', 'PSReadLine') {
         if (-not (Get-Module $module -ListAvailable)) { continue }

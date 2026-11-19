@@ -446,11 +446,16 @@ upgrade_tools() {
         info "Updating Codex CLI..."
         npm install -g @openai/codex || warn "Codex CLI update failed"
     fi
-    if command -v herdr >/dev/null 2>&1; then
+    # herdr_bin also finds a binary in ~/.local/bin that is not on PATH yet,
+    # so an existing install is updated rather than installed a second time.
+    local herdr
+    if herdr=$(herdr_bin); then
         info "Updating herdr..."
-        herdr update || warn "herdr update failed"
-        install_herdr_skill
+        "$herdr" update || warn "herdr update failed"
+    else
+        try_step "herdr install" install_herdr
     fi
+    install_herdr_skill
 }
 
 upgrade_zinit() {

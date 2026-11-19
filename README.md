@@ -16,7 +16,7 @@ make install
 | `make` / `make help` | List available targets |
 | `make install` | Install dependencies + tools, copy configs, install vim plugins |
 | `make update` | Copy configs into `$HOME` only (re-run any time); `FORCE=1` overwrites locally modified skills and CLAUDE.md |
-| `make upgrade` | Upgrade installed OS packages, curl-installed tools (claude, uv, nvm, herdr), Codex CLI, zinit, and vim plugins; claude, uv, nvm and Codex are installed if missing |
+| `make upgrade` | Upgrade installed OS packages, curl-installed tools (claude, uv, nvm, herdr), Codex CLI, zinit, and vim plugins; claude, uv, nvm, Codex and herdr are installed if missing |
 | `make reinstall` | Clean out installed configs and plugin managers, then install fresh (`uninstall` + `install`) |
 | `make uninstall` | Remove installed configs and plugin managers |
 | `make test` | Run the sandboxed test suite (never touches your real `$HOME`); on Windows run `tests/test.sh` or `tests/test.ps1` directly |
@@ -43,7 +43,7 @@ git clone https://github.com/eric2969/dotfiles.git; cd dotfiles
 .\setup.ps1 -SkipDeps                # install without winget packages (elevated shell required)
 .\setup.ps1 -Action update           # copy configs only
 .\setup.ps1 -Action update -Force    # also overwrite locally modified skills / CLAUDE.md
-.\setup.ps1 -Action upgrade          # upgrade installed packages and tools; installs missing claude/uv/nvm/codex
+.\setup.ps1 -Action upgrade          # upgrade installed packages and tools; installs missing claude/uv/nvm/codex/herdr
 .\setup.ps1 -Action reinstall        # remove, then install fresh (elevated shell required)
 .\setup.ps1 -Action uninstall        # remove
 .\setup.ps1 -Action doctor           # report why the prompt is not showing up
