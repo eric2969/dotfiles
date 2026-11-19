@@ -2,6 +2,10 @@
 set -euo pipefail
 
 NVM_VERSION=v0.40.3
+# .bash_profile loads nvm from ~/.nvm, so install it there too. Left unset,
+# nvm's installer picks $XDG_CONFIG_HOME/nvm when that is set, where neither
+# this script nor the shell would ever find it.
+export NVM_DIR="$HOME/.nvm"
 
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
@@ -182,15 +186,29 @@ install_uv() {
     curl -fsSL https://astral.sh/uv/install.sh | env UV_NO_MODIFY_PATH=1 sh
 }
 
+# nvm.sh, not the directory, marks an install: an empty ~/.nvm left by an
+# interrupted run must not be mistaken for a working nvm.
+nvm_installed() {
+    [ -s "$NVM_DIR/nvm.sh" ]
+}
+
+# Runs nvm's pinned installer, which both installs and updates nvm.
+run_nvm_installer() {
+    # The installer refuses a custom NVM_DIR that does not exist yet, and with
+    # XDG_CONFIG_HOME set ~/.nvm counts as custom.
+    mkdir -p "$NVM_DIR" || return
+    # nvm init lives in .bash_profile; PROFILE=/dev/null stops the installer
+    # from appending its own lines to rc files.
+    curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash
+}
+
 install_nvm() {
-    if [ -d "${NVM_DIR:-$HOME/.nvm}" ]; then
+    if nvm_installed; then
         echo "nvm already installed."
         return 0
     fi
     info "Installing nvm..."
-    # nvm init lives in .bash_profile; PROFILE=/dev/null stops the installer
-    # from appending its own lines to rc files.
-    curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash
+    run_nvm_installer
 }
 
 # setup.sh runs as a non-interactive script, so the nvm init in .bash_profile
@@ -199,18 +217,18 @@ install_nvm() {
 # has a default Node, loading it also puts that Node ahead of a system npm,
 # whose global installs need root.
 load_nvm() {
-    local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
-    if [ ! -s "$nvm_sh" ]; then
+    if ! nvm_installed; then
         return 1
     fi
     if ! command -v nvm >/dev/null 2>&1; then
         # shellcheck source=/dev/null
-        source "$nvm_sh"
+        source "$NVM_DIR/nvm.sh"
     fi
 }
 
 # Mirrors Install-Codex in setup.ps1: nvm provides Node, Node provides npm,
-# npm provides Codex. A missing link is a warning, never a failed bootstrap.
+# npm provides Codex. Callers run it through try_step, so a failure is
+# reported at the end instead of aborting the rest of the run.
 install_codex() {
     load_nvm || true
     if command -v codex >/dev/null 2>&1; then
@@ -219,17 +237,17 @@ install_codex() {
     fi
     if ! command -v npm >/dev/null 2>&1; then
         if ! command -v nvm >/dev/null 2>&1; then
-            warn "Neither npm nor nvm found, skipping Codex CLI."
-            return 0
+            warn "Neither npm nor nvm found, cannot install Codex CLI."
+            return 1
         fi
         info "Installing Node.js LTS for Codex CLI..."
         if ! nvm install --lts; then
-            warn "nvm install --lts failed, skipping Codex CLI."
-            return 0
+            warn "nvm install --lts failed, cannot install Codex CLI."
+            return 1
         fi
     fi
     info "Installing Codex CLI..."
-    npm install -g @openai/codex || warn "Codex CLI install failed"
+    npm install -g @openai/codex
 }
 
 install_herdr() {
@@ -397,19 +415,33 @@ upgrade_deps() {
     fi
 }
 
+# A tool added to the repo after this machine was bootstrapped would never
+# arrive through 'make update', so upgrade installs whatever is missing
+# instead of skipping it. Order matters: Codex needs nvm's Node.
 upgrade_tools() {
     if command -v claude >/dev/null 2>&1; then
         info "Updating Claude Code..."
         claude update || warn "claude update failed"
+    else
+        try_step "Claude Code install" install_claude
     fi
     if command -v uv >/dev/null 2>&1; then
         info "Updating uv..."
         uv self update || warn "uv self update failed"
+    else
+        try_step "uv install" install_uv
+    fi
+    if nvm_installed; then
+        # nvm has no self-update; re-run the pinned installer to sync to NVM_VERSION.
+        info "Syncing nvm to $NVM_VERSION..."
+        run_nvm_installer || warn "nvm update failed"
+    else
+        try_step "nvm install" install_nvm
     fi
     load_nvm || true
     # A Codex not owned by npm (installed some other way) is left alone.
     if ! command -v codex >/dev/null 2>&1; then
-        install_codex
+        try_step "Codex CLI install" install_codex
     elif command -v npm >/dev/null 2>&1; then
         info "Updating Codex CLI..."
         npm install -g @openai/codex || warn "Codex CLI update failed"
@@ -418,12 +450,6 @@ upgrade_tools() {
         info "Updating herdr..."
         herdr update || warn "herdr update failed"
         install_herdr_skill
-    fi
-    # nvm has no self-update; re-run the pinned installer to sync to NVM_VERSION.
-    if [ -d "${NVM_DIR:-$HOME/.nvm}" ]; then
-        info "Syncing nvm to $NVM_VERSION..."
-        curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash \
-            || warn "nvm update failed"
     fi
 }
 
@@ -466,6 +492,32 @@ set_default_shell() {
     chsh -s "$zsh_path"
 }
 
+# Runs one install step without letting its failure abort the rest: under
+# set -e a single unreachable installer used to stop the whole bootstrap, so
+# every tool after it (uv, nvm, Codex, ...) silently never got installed.
+FAILED_STEPS=()
+try_step() { # try_step <description> <command...>
+    local desc=$1 status=0
+    shift
+    "$@" || status=$?
+    if [ "$status" -ne 0 ]; then
+        warn "$desc failed (exit $status), continuing."
+        FAILED_STEPS+=("$desc")
+    fi
+}
+
+report_failed_steps() {
+    if [ "${#FAILED_STEPS[@]}" -eq 0 ]; then
+        return 0
+    fi
+    warn "These steps failed; fix the cause and re-run:"
+    local step
+    for step in "${FAILED_STEPS[@]}"; do
+        warn "  - $step"
+    done
+    return 1
+}
+
 main() {
     # 'make update' calls this so the generated and machine-dependent skills are
     # refreshed alongside the repo-managed ones, without duplicating logic there.
@@ -484,6 +536,7 @@ main() {
         upgrade_gh
         upgrade_tools
         upgrade_zinit
+        report_failed_steps || return 1
         ok "Upgrade finished. Run 'make update' if configs changed, then restart your terminal."
         return 0
     fi
@@ -501,14 +554,15 @@ main() {
     install_font
     install_zinit
     install_vim_plug
-    install_claude
-    install_uv
-    install_nvm
-    install_codex
-    install_herdr
+    try_step "Claude Code install" install_claude
+    try_step "uv install" install_uv
+    try_step "nvm install" install_nvm
+    try_step "Codex CLI install" install_codex
+    try_step "herdr install" install_herdr
     install_herdr_skill
     install_apple_fm_skill
     set_default_shell
+    report_failed_steps || return 1
     ok "Bootstrap finished. Run 'make update' to copy configs, then restart your terminal."
 }
 

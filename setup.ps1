@@ -4,7 +4,7 @@
 .DESCRIPTION
     install   - install dependencies (git, gh, vim, choco, claude, codex, herdr, uv, nvm + Node LTS), Nerd Font, vim-plug, then copy configs
     update    - copy configs only
-    upgrade   - upgrade installed packages and tools (winget incl. gh, choco, claude, codex, herdr, uv, PowerShell modules for 7 and 5.1, vim plugins)
+    upgrade   - upgrade installed packages and tools (winget incl. gh, choco, claude, codex, herdr, uv, PowerShell modules for 7 and 5.1, vim plugins); claude, uv, nvm and codex are installed when missing
     reinstall - remove installed configs, then install fresh (uninstall + install)
     uninstall - remove configs installed by this script
     doctor    - report why the PowerShell prompt is not showing up (read-only)
@@ -59,6 +59,26 @@ function Update-SessionPath {
         }
     }
     $env:PATH = $dirs -join ';'
+}
+
+# Runs a vendor's "irm <url> | iex" installer in a child PowerShell. Piped into
+# Invoke-Expression in this process, an installer's own 'exit 1' (uv's does
+# that on any error) or a download error under ErrorActionPreference=Stop ended
+# setup.ps1 itself, so every tool after the first failure was silently never
+# installed. In a child process a failure is just an exit code to report.
+function Invoke-RemoteInstaller([string]$Name, [string]$Url) {
+    $shell = (Get-Process -Id $PID).Path
+    # TLS 1.2 is not on by default in Windows PowerShell 5.1.
+    $command = "[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-RestMethod '$Url' | Invoke-Expression"
+    # Out-Host sends the installer's output to the console, not the pipeline.
+    & $shell -NoProfile -ExecutionPolicy Bypass -Command $command | Out-Host
+    $status = $LASTEXITCODE
+    # Installers write PATH to the registry only; import it so later steps in
+    # this run can find what was just installed.
+    Update-SessionPath
+    if ($status -ne 0) {
+        Write-Warning "$Name installer exited with code $status, continuing."
+    }
 }
 
 # ---------- Preflight ----------
@@ -342,10 +362,13 @@ function Install-Choco {
         return
     }
     Write-Host 'Installing Chocolatey...' -ForegroundColor Yellow
-    Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-    # The installer only puts choco on the registry PATH; without this the very
-    # next step (Install-Nvm) would not find the command it just installed.
-    Update-SessionPath
+    # Invoke-RemoteInstaller also imports the registry PATH, without which the
+    # very next step (Install-Nvm) would not find the command it just installed.
+    Invoke-RemoteInstaller 'Chocolatey' 'https://community.chocolatey.org/install.ps1'
+    # The installer ran in a child process, so its ChocolateyInstall variable
+    # only reached the registry; choco and package scripts read it from here.
+    $value = [Environment]::GetEnvironmentVariable('ChocolateyInstall', 'Machine')
+    if ($value) { $env:ChocolateyInstall = $value }
 }
 
 function Install-Claude {
@@ -354,7 +377,7 @@ function Install-Claude {
         return
     }
     Write-Host 'Installing Claude Code...' -ForegroundColor Yellow
-    Invoke-RestMethod https://claude.ai/install.ps1 | Invoke-Expression
+    Invoke-RemoteInstaller 'Claude Code' 'https://claude.ai/install.ps1'
 }
 
 function Install-Uv {
@@ -363,7 +386,7 @@ function Install-Uv {
         return
     }
     Write-Host 'Installing uv...' -ForegroundColor Yellow
-    Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+    Invoke-RemoteInstaller 'uv' 'https://astral.sh/uv/install.ps1'
 }
 
 function Install-Nvm {
@@ -424,10 +447,9 @@ function Install-Herdr {
         return
     }
     Write-Host 'Installing herdr...' -ForegroundColor Yellow
-    Invoke-RestMethod https://herdr.dev/install.ps1 | Invoke-Expression
-    # The installer only writes PATH to the registry; import it so the agent
-    # skill can be generated in this same run.
-    Update-SessionPath
+    # Invoke-RemoteInstaller imports the registry PATH, so the agent skill can
+    # be generated in this same run.
+    Invoke-RemoteInstaller 'herdr' 'https://herdr.dev/install.ps1'
 }
 
 # Developer Mode lets non-elevated processes create the skill symlinks. Writing
@@ -969,15 +991,34 @@ function Invoke-Upgrade {
             Write-Warning 'Chocolatey upgrades need an elevated shell, skipping nvm.'
         }
     }
+    # A tool added to the repo after this machine was set up would never arrive
+    # through 'update', so upgrade installs whatever is missing instead of
+    # skipping it. Order matters: Codex needs nvm's Node.
     if (Get-Command claude -ErrorAction SilentlyContinue) {
         Write-Host 'Updating Claude Code...' -ForegroundColor Yellow
         claude update
+        if ($LASTEXITCODE -ne 0) { Write-Warning "claude update exited with code $LASTEXITCODE" }
+    } else {
+        Install-Claude
     }
     if (Get-Command uv -ErrorAction SilentlyContinue) {
         Write-Host 'Updating uv...' -ForegroundColor Yellow
         uv self update
+        if ($LASTEXITCODE -ne 0) { Write-Warning "uv self update exited with code $LASTEXITCODE" }
+    } else {
+        Install-Uv
     }
-    if (Get-Command npm -ErrorAction SilentlyContinue) {
+    if (-not (Get-Command nvm -ErrorAction SilentlyContinue)) {
+        if (Test-Elevated) {
+            Install-Nvm
+        } else {
+            Write-Warning 'nvm-windows is missing and installing it needs an elevated shell; re-run upgrade as Administrator.'
+        }
+    }
+    # A Codex not owned by npm (installed some other way) is left alone.
+    if (-not (Get-Command codex -ErrorAction SilentlyContinue)) {
+        Install-Codex
+    } elseif (Get-Command npm -ErrorAction SilentlyContinue) {
         Write-Host 'Updating Codex CLI...' -ForegroundColor Yellow
         npm install -g '@openai/codex'
         if ($LASTEXITCODE -ne 0) { Write-Warning "Codex CLI update exited with code $LASTEXITCODE" }
