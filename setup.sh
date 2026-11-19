@@ -193,24 +193,43 @@ install_nvm() {
     curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash
 }
 
+# setup.sh runs as a non-interactive script, so the nvm init in .bash_profile
+# never ran here: without this, a Node installed through nvm (the repo's only
+# way of getting one) is invisible and Codex looks uninstallable. Once nvm
+# has a default Node, loading it also puts that Node ahead of a system npm,
+# whose global installs need root.
+load_nvm() {
+    local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
+    if [ ! -s "$nvm_sh" ]; then
+        return 1
+    fi
+    if ! command -v nvm >/dev/null 2>&1; then
+        # shellcheck source=/dev/null
+        source "$nvm_sh"
+    fi
+}
+
+# Mirrors Install-Codex in setup.ps1: nvm provides Node, Node provides npm,
+# npm provides Codex. A missing link is a warning, never a failed bootstrap.
 install_codex() {
+    load_nvm || true
     if command -v codex >/dev/null 2>&1; then
         echo "Codex CLI already installed."
         return 0
     fi
     if ! command -v npm >/dev/null 2>&1; then
-        local nvm_sh="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
-        if [ ! -s "$nvm_sh" ]; then
-            warn "npm not found, cannot install Codex CLI."
-            return 1
+        if ! command -v nvm >/dev/null 2>&1; then
+            warn "Neither npm nor nvm found, skipping Codex CLI."
+            return 0
         fi
         info "Installing Node.js LTS for Codex CLI..."
-        # shellcheck source=/dev/null
-        source "$nvm_sh"
-        nvm install --lts
+        if ! nvm install --lts; then
+            warn "nvm install --lts failed, skipping Codex CLI."
+            return 0
+        fi
     fi
     info "Installing Codex CLI..."
-    npm install -g @openai/codex
+    npm install -g @openai/codex || warn "Codex CLI install failed"
 }
 
 install_herdr() {
@@ -387,7 +406,11 @@ upgrade_tools() {
         info "Updating uv..."
         uv self update || warn "uv self update failed"
     fi
-    if command -v npm >/dev/null 2>&1; then
+    load_nvm || true
+    # A Codex not owned by npm (installed some other way) is left alone.
+    if ! command -v codex >/dev/null 2>&1; then
+        install_codex
+    elif command -v npm >/dev/null 2>&1; then
         info "Updating Codex CLI..."
         npm install -g @openai/codex || warn "Codex CLI update failed"
     fi

@@ -16,7 +16,7 @@ make install
 | `make` / `make help` | List available targets |
 | `make install` | Install dependencies + tools, copy configs, install vim plugins |
 | `make update` | Copy configs into `$HOME` only (re-run any time); `FORCE=1` overwrites locally modified skills and CLAUDE.md |
-| `make upgrade` | Upgrade installed OS packages, curl-installed tools (claude, uv, nvm, herdr), zinit, and vim plugins |
+| `make upgrade` | Upgrade installed OS packages, curl-installed tools (claude, uv, nvm, herdr), and Codex CLI (installed through nvm if missing), zinit, and vim plugins |
 | `make reinstall` | Clean out installed configs and plugin managers, then install fresh (`uninstall` + `install`) |
 | `make uninstall` | Remove installed configs and plugin managers |
 | `make test` | Run the sandboxed test suite (never touches your real `$HOME`); on Windows run `tests/test.sh` or `tests/test.ps1` directly |
